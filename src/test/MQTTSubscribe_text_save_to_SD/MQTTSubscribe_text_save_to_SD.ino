@@ -1,20 +1,5 @@
-/*
- *  SPRESENSE_WiFi.ino - GainSpan WiFi Module Control Program
- *  Copyright 2022 Spresense Users
- *
- *  This work is free software; you can redistribute it and/or modify it under the terms 
- *  of the GNU Lesser General Public License as published by the Free Software Foundation; 
- *  either version 2.1 of the License, or (at your option) any later version.
- *
- *  This work is distributed in the hope that it will be useful, but without any warranty; 
- *  without even the implied warranty of merchantability or fitness for a particular 
- *  purpose. See the GNU Lesser General Public License for more details.
- *
- *  You should have received a copy of the GNU Lesser General Public License along with 
- *  this work; if not, write to the Free Software Foundation, 
- *  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-*/
-
+#include <SDHCI.h>
+#include <Flash.h>
 #include <MqttGs2200.h>
 #include <TelitWiFi.h>
 #include "config.h"
@@ -27,6 +12,11 @@
 TelitWiFi gs2200;
 TWIFI_Params gsparams;
 MqttGs2200 theMqttGs2200(&gs2200);
+
+// ファイル保存管理用
+SDClass SD;
+File imgFile;  // Fileオブジェクト
+
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -69,7 +59,7 @@ MQTTGS2200_Mqtt mqtt;
 
 // the loop function runs over and over again forever
 void loop() {
-
+  ConsolePrintf("loop\n");
 	if (!served) {
 		// Start a MQTT client
 		ConsoleLog( "Start MQTT Client");
@@ -90,21 +80,38 @@ void loop() {
 		} 
 
 		served = true;
-	}
-	else {
+	}	else {
 		uint64_t start = millis();
+
 		while (served) {
+      
 			if (msDelta(start) < SUBSCRIBE_TIMEOUT ) {
 				String data;
+
 				/* just in case something from GS2200 */
+        if (gs2200.available()){
+          SD.begin();
+          imgFile = SD.open("mqtt.txt", FILE_WRITE);  // SD.open()をwhileの外に移動
+          ConsolePrintf("SD open.");
+        }
+
 				while (gs2200.available()) {
+          Serial.println(gs2200.available());
 					if (false == theMqttGs2200.receive(data)) {
+            ConsolePrintf("theMqttGS2200receive(data)");
 						served = false; // quite the loop
 						break;
 					}
 
 					Serial.println("Recieve data: " + data);
-				}
+          imgFile.println(data);
+        }
+
+        if (imgFile) {  // servedがfalseになった時点でファイルを閉じる
+          imgFile.close();
+          ConsolePrintf("SD closed.\n");
+        }
+
 				start = millis();
 			} else {
 				ConsolePrintf("Subscribed over for %d ms! \n", SUBSCRIBE_TIMEOUT);
