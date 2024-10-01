@@ -46,7 +46,7 @@ void setup() {
 
     // setup内で一度メッセージをパブリッシュ
     MQTTGS2200_Mqtt mqtt;
-    strncpy(mqtt.params.topic, MQTT_TOPIC_3, sizeof(mqtt.params.topic));
+    strncpy(mqtt.params.topic, MQTT_TOPIC_2, sizeof(mqtt.params.topic));
     mqtt.params.QoS = 0;
     mqtt.params.retain = 0;
 
@@ -94,15 +94,6 @@ void loop() {
             ConsolePrintf("最初のトピックにサブスクライブしました!\n");
         }
 
-        // 2番目のトピックにサブスクライブ
-        strncpy(mqtt2.params.topic, MQTT_TOPIC_2, sizeof(mqtt2.params.topic)); // MQTT_TOPIC_2をconfig.hで定義
-        mqtt2.params.QoS = 0;  // QoSレベルを0に設定
-        mqtt2.params.retain = 0; // リテインフラグを無効に設定
-
-        if (true == theMqttGs2200.subscribe(&mqtt2)) {
-            ConsolePrintf("2番目のトピックにサブスクライブしました!\n");
-        }
-
         served = true; // サブスクリプション完了
     } else {
         uint64_t start = millis(); // 現在の時間を取得
@@ -118,7 +109,6 @@ void loop() {
                     }
                     Serial.println("最初のトピックから受信したデータ: " + data); // 受信したデータを表示
 
-                    // 2番目のトピックからのデータに対するロジックを追加することも可能
                 }
                 start = millis(); // 時間を更新
             } else {

@@ -20,20 +20,11 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-//#define  AP_SSID        "J00WLN1305A"
-//#define  PASSPHRASE     "m1n0ru0869553434@LAN"
+#define  AP_SSID        "GS2200_LIMITED_AP"
+#define  PASSPHRASE     "123456789"
+#define  AP_CHANNEL     6
 
-//#define  MQTT_SRVR     "192.168.1.65"
-//#define  MQTT_PORT     "1883"
-//#define  MQTT_CLI_ID   "Telit_Device_pub"
-//#define  MQTT_TOPIC    "fromNodeRed"
+#define  TCPSRVR_PORT   "80"
 
-#define  AP_SSID        "kumakero2.4"
-#define  PASSPHRASE     "4roses6126"
-
-#define  MQTT_SRVR     "192.168.50.104"
-#define  MQTT_PORT     "1883"
-#define  MQTT_CLI_ID   "Telit_Device_pub"
-#define  MQTT_TOPIC    "spresense"
 
 #endif /*_CONFIG_H_*/

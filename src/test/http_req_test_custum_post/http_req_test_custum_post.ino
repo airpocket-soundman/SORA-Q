@@ -18,8 +18,13 @@
 #include <HttpGs2200.h>
 #include <TelitWiFi.h>
 #include "config.h"
+#include <SDHCI.h>
+#include <Camera.h>
 
 #define  CONSOLE_BAUDRATE  115200
+
+SDClass theSD;
+
 
 typedef enum{
 	POST=0,
@@ -45,6 +50,78 @@ void parse_httpresponse(char *message)
 		ConsolePrintf("Response : %s\r\n", p+8);
 	}
 }
+/* ---------------------------------------------------------------------
+ * Function to print error message from the camera
+* ----------------------------------------------------------------------
+*/
+void printError(enum CamErr err) {
+  Serial.print("Error: ");
+  switch (err) {
+    case CAM_ERR_NO_DEVICE:
+      Serial.println("No Device");
+      break;
+    case CAM_ERR_ILLEGAL_DEVERR:
+      Serial.println("Illegal device error");
+      break;
+    case CAM_ERR_ALREADY_INITIALIZED:
+      Serial.println("Already initialized");
+      break;
+    case CAM_ERR_NOT_INITIALIZED:
+      Serial.println("Not initialized");
+      break;
+    case CAM_ERR_NOT_STILL_INITIALIZED:
+      Serial.println("Still picture not initialized");
+      break;
+    case CAM_ERR_CANT_CREATE_THREAD:
+      Serial.println("Failed to create thread");
+      break;
+    case CAM_ERR_INVALID_PARAM:
+      Serial.println("Invalid parameter");
+      break;
+    case CAM_ERR_NO_MEMORY:
+      Serial.println("No memory");
+      break;
+    case CAM_ERR_USR_INUSED:
+      Serial.println("Buffer already in use");
+      break;
+    case CAM_ERR_NOT_PERMITTED:
+      Serial.println("Operation not permitted");
+      break;
+    default:
+      break;
+  }
+}
+
+
+/* ---------------------------------------------------------------------
+ * Callback from Camera library when video frame is captured.
+* ----------------------------------------------------------------------
+*/
+void CamCB(CamImage img) {
+
+  /* Check the img instance is available or not. */
+
+  if (img.isAvailable()) {
+
+    /* If you want RGB565 data, convert image data format to RGB565 */
+
+    img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
+
+    /* You can use image data directly by using getImgSize() and getImgBuff().
+       * for displaying image to a display, etc. */
+
+    Serial.print("Image data size = ");
+    Serial.print(img.getImgSize(), DEC);
+    Serial.print(" , ");
+
+    Serial.print("buff addr = ");
+    Serial.print((unsigned long)img.getImgBuff(), HEX);
+    Serial.println("");
+  } else {
+    Serial.println("Failed to get video stream image");
+  }
+}
+
 
 /* ---------------------------------------------------------------------
 * Function to send byte data to the HTTP server
@@ -69,6 +146,7 @@ void uploadImage(char *filename) {
   File file = theSD.open(filename, FILE_READ);
   // Calculate size in byte
   uint32_t file_size = file.size();
+  
 
   // Define_a body pointer having the continuous memory space with size `file_size`
   char *body = (char *)malloc(file_size);  // +1 is null char
@@ -129,6 +207,8 @@ void setup() {
 
 	digitalWrite(LED0, HIGH); // turn on LED
 
+
+
 }
 
 // the loop function runs over and over again forever
@@ -136,6 +216,10 @@ void loop() {
 	httpStat = POST;
 	bool result = false;
 	static int count = 0;
+
+  char filename[24]={0};
+  sprintf(filename,"airpocket_newlogo.jpg");
+  //uploadImage(filename);
 
 	while (1) {
 		switch (httpStat) {
@@ -161,6 +245,8 @@ void loop() {
 					ConsolePrintf( "\r\n");
 				}
 			} while (result);
+
+
 
 			result = theHttpGs2200.end();
 

@@ -20,10 +20,16 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-#define  AP_SSID        "J00WLN1305A"
-#define  PASSPHRASE     "m1n0ru0869553434@LAN"
+//#define  AP_SSID        "J00WLN1305A"
+//#define  PASSPHRASE     "m1n0ru0869553434@LAN"
 
-#define  MQTT_SRVR     "192.168.1.65"
+//#define  MQTT_SRVR     "192.168.1.65"
+//#define  MQTT_PORT     "1883"
+
+#define  AP_SSID        "kumakero2.4"
+#define  PASSPHRASE     "4roses6126"
+
+#define  MQTT_SRVR     "192.168.50.104"
 #define  MQTT_PORT     "1883"
 #define  MQTT_CLI_ID   "Telit_Device_pub"
 #define  MQTT_TOPIC    "fromNodeRed"
