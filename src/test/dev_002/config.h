@@ -29,21 +29,16 @@
 //#define  AP_SSID        "kumakero2.4"
 //#define  PASSPHRASE     "4roses6126"
 
-#define  MQTT_SRVR     "192.168.1.65"
-#define  MQTT_PORT     "1883"
-
-
 
 //#define  HTTP_SRVR_IP   "192.168.50.104"
 //#define  HTTP_PORT      "1880"
 
 
-//#define  AP_SSID        "J00WLN1305A"
-//#define  PASSPHRASE     "m1n0ru0869553434@LAN"
+#define  HTTP_SRVR_IP  "192.168.1.65"
+#define  HTTP_PORT     "1880"
 
-//#define  HTTP_SRVR_IP  "192.168.1.65"
-//#define  HTTP_PORT     "1880"
-#define  HTTP_GET_PATH  "/data"
-#define  HTTP_POST_PATH "/data"
+
+#define  HTTP_GET_PATH  "/getdata"
+#define  HTTP_POST_PATH "/postdata"
 
 #endif /*_CONFIG_H_*/
