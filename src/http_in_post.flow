@@ -1,0 +1,91 @@
+[
+    {
+        "id": "4a07d5e80acdc368",
+        "type": "http in",
+        "z": "8a78f6446082a23a",
+        "name": "",
+        "url": "/postdata",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 260,
+        "y": 1600,
+        "wires": [
+            [
+                "6466ccc42269f873",
+                "5c8c8679952f1a27",
+                "f8beef315ee261bc"
+            ]
+        ]
+    },
+    {
+        "id": "f8beef315ee261bc",
+        "type": "file",
+        "z": "8a78f6446082a23a",
+        "name": "",
+        "filename": "/home/minoru/Workspace/SORA-Q/test.jpg",
+        "filenameType": "str",
+        "appendNewline": false,
+        "createDir": false,
+        "overwriteFile": "true",
+        "encoding": "none",
+        "x": 630,
+        "y": 1560,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "6466ccc42269f873",
+        "type": "change",
+        "z": "8a78f6446082a23a",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "data recieved",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 540,
+        "y": 1600,
+        "wires": [
+            [
+                "b7e8b9f5fbd3e26e"
+            ]
+        ]
+    },
+    {
+        "id": "5c8c8679952f1a27",
+        "type": "image viewer",
+        "z": "8a78f6446082a23a",
+        "name": "",
+        "width": 160,
+        "data": "payload",
+        "dataType": "msg",
+        "active": true,
+        "x": 510,
+        "y": 1640,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "b7e8b9f5fbd3e26e",
+        "type": "http response",
+        "z": "8a78f6446082a23a",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 830,
+        "y": 1600,
+        "wires": []
+    }
+]
