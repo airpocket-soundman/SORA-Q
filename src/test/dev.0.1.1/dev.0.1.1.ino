@@ -1,12 +1,12 @@
 /* SORA-Q projeckt                                  
  * ver.0.1.0 SDがある場合はFlashにファイルをコピーする
- * ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い
- *
+ * ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
+ * ver.0.1.2 起動時バージョン表示を追加
  *
  *
  */
 
-char version[] = "Ver.0.1.1";
+char version[] = "Ver.0.1.2";
 
 #include <HttpGs2200.h>
 #include <GS2200Hal.h>

@@ -1,12 +1,12 @@
 /* SORA-Q projeckt                                  
  * ver.0.1.0 SDがある場合はFlashにファイルをコピーする
- * ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い
- *
+ * ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
+ * ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
  *
  *
  */
 
-char version[] = "Ver.0.1.1";
+char version[] = "Ver.0.1.2";
 
 #include <HttpGs2200.h>
 #include <GS2200Hal.h>
@@ -20,8 +20,8 @@ char version[] = "Ver.0.1.1";
 
 #define CONSOLE_BAUDRATE 115200
 #define TOTAL_PICTURE_COUNT 3
-#define PICTURE_INTERVAL 1
-#define FIRST_INTERVAL 3
+#define PICTURE_INTERVAL 1000
+#define FIRST_INTERVAL 3000
 
 const uint16_t RECEIVE_PACKET_SIZE = 1500;
 uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
@@ -37,14 +37,58 @@ TWIFI_Params gsparams;
 HttpGs2200 theHttpGs2200(&gs2200);
 HTTPGS2200_HostParams hostParams;
 SDClass theSD;
-int take_picture_count = 0;
+
+// test mode on/off
+bool imgPostTest    = false;    //イメージ撮影とhttp post requestのテスト
+bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
+bool digitalOutTest = true;    //
+bool analogReadTest = true;
 
 
+void checkDigitalOut(){
+  int counter = 10;
+  char buffer[10];
+  Serial.println("==== Digital out Test D18/D19/D20/D21");
+  while (counter > 0){
+    sprintf(buffer, "ON, %02d/10",counter);
+    Serial.println(buffer);
+    digitalWrite(18,HIGH);
+    digitalWrite(19,HIGH);
+    digitalWrite(20,HIGH);
+    digitalWrite(21,HIGH);
+
+    delay(1000);
+    Serial.println("OFF");
+    digitalWrite(18,LOW);
+    digitalWrite(19,LOW);
+    digitalWrite(20,LOW);
+    digitalWrite(21,LOW);
+    delay(1000);
+    counter--;
+  }
+  Serial.println("==== digital out test finisheda");
+}
+
+void checkAnalogRead(){
+  int counter = 300;
+  int valueA = 0;
+  int valueB = 0;
+  char buffer[30];
+  Serial.println("==== Analog Read test A2/A3");
+  while (counter > 0){
+    valueA = analogRead(A2);
+    valueB = analogRead(A3);
+    sprintf(buffer, "valueA = %d / valueB = %d /    %03d/300",valueA, valueB, counter);
+    Serial.println(buffer);
+    delay(100);
+    counter--;
+  }
+  Serial.println("==== analog read test finished.");
+}
 /*
  * SDが存在する場合はnnbファイルをFlashメモリにコピーする
  */
 void move_nnbFile(){
-  
   if (nnb_copy){
     File readFile = theSD.open(nnbFile, FILE_READ);
     uint32_t file_size = readFile.size();
@@ -80,11 +124,9 @@ void move_nnbFile(){
       Serial.println("フラッシュメモリのファイルオープンに失敗しました");
     }
     free(body);
+  } else {
+    Serial.println("move nnb file passed.\n");
   }
-  
-  //NNBファイルチェック。通常はオフ
-  //uploadNNB();
-
 }
 
 /*
@@ -92,7 +134,7 @@ void move_nnbFile(){
  */
 void uploadNNB() {
   // Create body
-  Serial.println("フラッシュのNNBファイルを送信========================");
+  Serial.println("===== start NNB file post");
   File file = Flash.open(flashPath, FILE_READ);
   Serial.println("flash opened");
   if (file){
@@ -223,6 +265,47 @@ void uploadImage(CamImage img) {
 }
 
 
+
+/* ---------------------------------------------------------------------
+* Function to send byte data to the HTTP server
+* ----------------------------------------------------------------------
+*/
+bool custom_post(const char *url_path, const char *body, uint32_t size) {
+  char size_string[10];
+  snprintf(size_string, sizeof(size_string), "%d", size);
+  theHttpGs2200.config(HTTP_HEADER_CONTENT_LENGTH, size_string);
+  Serial.println("Size");
+  Serial.println(size_string);
+
+  bool result = false;
+  result = theHttpGs2200.connect();
+  WiFi_InitESCBuffer();
+  result = theHttpGs2200.send(HTTP_METHOD_POST, 10, url_path, body, size);
+  return result;
+
+}
+
+/* カメラ撮影とhttp request postのテスト*/
+void camImagePost(){
+  Serial.println("==== start Camera Image Post Test");
+  int take_picture_count = 0;
+  while (take_picture_count < TOTAL_PICTURE_COUNT) {
+    Serial.println("call takePicture()");
+    CamImage img = theCamera.takePicture();
+
+    if (img.isAvailable()) {
+      uploadImage(img);
+    } else {
+      Serial.println("Failed to take picture");
+    }
+  take_picture_count++;
+  }
+  theCamera.end();
+  Serial.println("====cam Image Post finished.\n");
+}
+
+
+
 /* ---------------------------------------------------------------------
 * Setup Function
 * ----------------------------------------------------------------------
@@ -249,6 +332,14 @@ void setup() {
   }
 
 
+  //Pin initialize
+  pinMode(18, OUTPUT);
+  pinMode(19, OUTPUT);
+  pinMode(20, OUTPUT);
+  pinMode(21, OUTPUT);
+
+  digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
+
   /* -----------------------------------
    * GS2200-WiFi Setup
    * -----------------------------------
@@ -257,7 +348,6 @@ void setup() {
   /* initialize digital pin LED_BUILTIN as an output. */
   pinMode(LED0, OUTPUT);
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
-  Serial.begin(CONSOLE_BAUDRATE);  // talk to PC
 
   /* Initialize SPI access of GS2200 */
   Init_GS2200_SPI_type(iS110B_TypeA);
@@ -331,51 +421,24 @@ void setup() {
   digitalWrite(LED0, HIGH);  // turn on LED
 
   move_nnbFile();
-}
-
-/* ---------------------------------------------------------------------
-* Function to send byte data to the HTTP server
-* ----------------------------------------------------------------------
-*/
-bool custom_post(const char *url_path, const char *body, uint32_t size) {
-  char size_string[10];
-  snprintf(size_string, sizeof(size_string), "%d", size);
-  theHttpGs2200.config(HTTP_HEADER_CONTENT_LENGTH, size_string);
-  Serial.println("Size");
-  Serial.println(size_string);
-
-  bool result = false;
-  result = theHttpGs2200.connect();
-  WiFi_InitESCBuffer();
-  result = theHttpGs2200.send(HTTP_METHOD_POST, 10, url_path, body, size);
-  return result;
-}
-
-
-bool first = false;
-// the loop function runs over and over again forever
-void loop() {
-
-  sleep(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
-  if (!first) {
-    // first = true;
-
-    if (take_picture_count < TOTAL_PICTURE_COUNT) {
-
-      Serial.println("call takePicture()");
-      CamImage img = theCamera.takePicture();
-
-      if (img.isAvailable()) {
-        uploadImage(img);
-      } else {
-        Serial.println("Failed to take picture");
-      }
-
-    } else if (take_picture_count == TOTAL_PICTURE_COUNT) {
-      Serial.println("End.");
-      theCamera.end();
-    }
-
-    take_picture_count++;
+  if(nnbFilePost){
+    uploadNNB();
   }
+  if(imgPostTest){
+    camImagePost();
+  }
+  if(digitalOutTest){
+    checkDigitalOut();
+  }
+  if(analogReadTest){
+    checkAnalogRead();
+  }
+
+}
+
+void loop() {
+  delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
+
+
+
 }
