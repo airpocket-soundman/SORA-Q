@@ -34,6 +34,8 @@ char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 //char nnbFile[] = "slim.nnb";
 
+String param1, param2, param3, param4, param5, param6;
+
 TelitWiFi gs2200;
 TWIFI_Params gsparams;
 HttpGs2200 theHttpGs2200(&gs2200);
@@ -50,6 +52,35 @@ bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
 bool digitalOutTest = false;    //
 bool analogReadTest = false;
 
+void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
+    int startIndex = 0;
+    int commaIndex;
+    int varCount = 0;
+
+    while ((commaIndex = input.indexOf(',', startIndex)) != -1 && varCount < 5) {
+        if (varCount == 0) {
+            var1 = input.substring(startIndex, commaIndex);
+        } else if (varCount == 1) {
+            var2 = input.substring(startIndex, commaIndex);
+        } else if (varCount == 2) {
+            var3 = input.substring(startIndex, commaIndex);
+        } else if (varCount == 3) {
+            var4 = input.substring(startIndex, commaIndex);
+        } else if (varCount == 4) {
+            var5 = input.substring(startIndex, commaIndex);
+        }
+        startIndex = commaIndex + 1;
+        varCount++;
+    }
+    
+    // 最後の変数に残りの部分を格納
+    if (varCount < 6) {
+        var6 = input.substring(startIndex);
+    } else {
+        var6 = ""; // 余った部分がない場合
+    }
+}
+
 void checkMQTTtopic(){ 
   String data;
   /* just in case something from GS2200 */
@@ -60,18 +91,17 @@ void checkMQTTtopic(){
     }
 
     Serial.println("Recieve data: " + data);
-          // JSON文をパース
-      // myArray.length() can be used to get the length of the array
-    Serial.print("data.length() = ");
-    Serial.println(data.length());
-    Serial.println();
-  
-    Serial.print("JSON.typeof(data[0]) = ");
-    Serial.println(JSON.typeof(data[0]));
-  
-    Serial.print("data[0] = ");
-    Serial.println(data[0]);
-    Serial.println();
+    
+    // dataをパース
+    splitString(data, param1, param2, param3, param4, param5, param6);
+    
+    Serial.println("param 1: " + param1);
+    Serial.println("param 2: " + param2);
+    Serial.println("param 3: " + param3);
+    Serial.println("param 4: " + param4);
+    Serial.println("param 5: " + param5);
+    Serial.println("param 6: " + param6);
+
   }
 
 
