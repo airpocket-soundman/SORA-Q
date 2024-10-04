@@ -39,7 +39,7 @@ HTTPGS2200_HostParams hostParams;
 SDClass theSD;
 
 // test mode on/off
-bool imgPostTest    = false;    //イメージ撮影とhttp post requestのテスト
+bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
 bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
 bool digitalOutTest = true;    //
 bool analogReadTest = true;
