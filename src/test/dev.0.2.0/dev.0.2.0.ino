@@ -17,7 +17,6 @@ char version[] = "Ver.0.2.0";
 #include <Camera.h>
 #include "config.h"
 #include <Flash.h>
-#include <Arduino_JSON.h>
 
 #define CONSOLE_BAUDRATE 115200
 #define TOTAL_PICTURE_COUNT 3

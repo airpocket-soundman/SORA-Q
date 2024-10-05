@@ -20,20 +20,20 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-#define  AP_SSID        "J00WLN1305A"
-#define  PASSPHRASE     "m1n0ru0869553434@LAN"
+//#define  AP_SSID        "J00WLN1305A"
+//#define  PASSPHRASE     "m1n0ru0869553434@LAN"
 
 //#define  AP_SSID        "SSID:J00WLN2206A_EXT2.4_2"
 //#define  PASSPHRASE     "o86q556264@CP"
 
-//#define  AP_SSID        "kumakero2.4"
-//#define  PASSPHRASE     "4roses6126"
+#define  AP_SSID        "kumakero2.4"
+#define  PASSPHRASE     "4roses6126"
 
-//#define  HTTP_SRVR_IP   "192.168.50.104"
-//#define  HTTP_PORT      "1880"
+#define  HTTP_SRVR_IP   "192.168.50.104"
+#define  HTTP_PORT      "1880"
 
-#define  HTTP_SRVR_IP  "192.168.1.65"
-#define  HTTP_PORT     "1880"
+//#define  HTTP_SRVR_IP  "192.168.1.65"
+//#define  HTTP_PORT     "1880"
 
 #define  HTTP_GET_PATH  "/getdata"
 #define  HTTP_POST_PATH "/postdata"

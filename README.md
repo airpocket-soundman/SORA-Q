@@ -14,3 +14,9 @@ https://developer.sony.com/spresense/spresense-api-references-arduino/Camera_8h.
 
 http post参考
 https://elchika.com/article/13a1da3a-d410-4d05-8087-ba78b855d7db/
+
+ILI9341 ドライバ
+https://github.com/kzhioki/Adafruit_ILI9341
+
+学習用画像取得プログラム
+https://github.com/TE-YoshinoriOota/Spresense-Tech-Seminar-Basic/blob/master/Sketches/Spresense_camera_take_picture/Spresense_camera_take_picture.ino
