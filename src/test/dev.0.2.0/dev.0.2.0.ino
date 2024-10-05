@@ -516,7 +516,7 @@ void setup() {
 
 void loop() {
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
-  
+  Serial.println("loop");
   checkMQTTtopic();
 
 
