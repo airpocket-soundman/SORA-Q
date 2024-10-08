@@ -20,7 +20,7 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-#define WORK //HOME or WORK
+#define HOME //HOME or WORK
 
 #ifdef HOME
 #define  AP_SSID        "kumakero2.4"

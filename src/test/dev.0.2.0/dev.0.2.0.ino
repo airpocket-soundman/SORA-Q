@@ -53,7 +53,7 @@ bool served = false;
 MQTTGS2200_Mqtt mqtt;
 
 // test mode on/off
-bool imgPostTest    = false;    //イメージ撮影とhttp post requestのテスト
+bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
 bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
 bool analogReadTest = false;
 bool driveTest      = true;
