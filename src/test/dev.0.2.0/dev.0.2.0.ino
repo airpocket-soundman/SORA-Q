@@ -24,6 +24,13 @@ char version[] = "Ver.0.2.0";
 #define FIRST_INTERVAL 3000
 #define SUBSCRIBE_TIMEOUT 60000	//ms
 
+#define AIN1 A2       //左車輪エンコーダ
+#define AIN2 A3       //右車輪エンコーダ
+#define PWM1 21       //左車輪出力
+#define PWM2 19       //右車輪出力
+#define ENB1 20       //左車輪方向
+#define ENB2 18       //右車輪方向
+
 const uint16_t RECEIVE_PACKET_SIZE = 1500;
 uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
 bool nnb_copy = true;
@@ -46,10 +53,77 @@ bool served = false;
 MQTTGS2200_Mqtt mqtt;
 
 // test mode on/off
-bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
+bool imgPostTest    = false;    //イメージ撮影とhttp post requestのテスト
 bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
-bool digitalOutTest = false;    //
 bool analogReadTest = false;
+bool driveTest      = true;
+
+void checkDrive(){
+
+  if (driveTest){
+    Serial.println("==== drive test start");
+    int counter = 10;
+    while(counter > 0){
+      Serial.print("counter = ");
+      Serial.println(counter);
+      Serial.println("PWM:255  ENB:HIGH");
+      analogWrite(PWM1,255);
+      analogWrite(PWM2,255);
+      digitalWrite(ENB1,HIGH);
+      digitalWrite(ENB2,HIGH);
+      delay(10000);
+      Serial.println("PWM:128  ENB:HIGH");
+      analogWrite(PWM1,128);
+      analogWrite(PWM2,128);
+      digitalWrite(ENB1,HIGH);
+      digitalWrite(ENB2,HIGH);
+      delay(10000);
+      Serial.println("PWM: 64  ENB:HIGH");
+      analogWrite(PWM1,64);
+      analogWrite(PWM2,64);
+      digitalWrite(ENB1,HIGH);
+      digitalWrite(ENB2,HIGH);
+      delay(10000);
+      Serial.println("PWM:  0  ENB:HIGH");
+      analogWrite(PWM1,32);
+      analogWrite(PWM2,32);
+      digitalWrite(ENB1,HIGH);
+      digitalWrite(ENB2,HIGH);
+      delay(10000);
+      Serial.println("PWM:255  ENB:LOW");
+      analogWrite(PWM1,255);
+      analogWrite(PWM2,255);
+      digitalWrite(ENB1,LOW);
+      digitalWrite(ENB2,LOW);
+      delay(10000);
+      Serial.println("PWM:128  ENB:LOW");
+      analogWrite(PWM1,128);
+      analogWrite(PWM2,128);
+      digitalWrite(ENB1,LOW);
+      digitalWrite(ENB2,LOW);
+      delay(10000);
+      Serial.println("PWM: 64  ENB:LOW");
+      analogWrite(PWM1,64);
+      analogWrite(PWM2,64);
+      digitalWrite(ENB1,LOW);
+      digitalWrite(ENB2,LOW);
+      delay(10000);
+      Serial.println("PWM:  0  ENB:LOW");
+      analogWrite(PWM1,32);
+      analogWrite(PWM2,32);
+      digitalWrite(ENB1,LOW);
+      digitalWrite(ENB2,LOW);
+      delay(10000);
+      counter--;
+    }
+    Serial.println("==== drive test is finished.\n");
+  } else {
+    Serial.println("==== drive test was skipped.\n");
+  }
+
+  
+}
+
 
 void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
     int startIndex = 0;
@@ -104,34 +178,6 @@ void checkMQTTtopic(){
   }
 
 
-}
-
-void checkDigitalOut(){
-  if (digitalOutTest){
-    int counter = 10;
-    char buffer[10];
-    Serial.println("==== Digital out Test D18/D19/D20/D21");
-    while (counter > 0){
-      sprintf(buffer, "ON, %02d/10",counter);
-      Serial.println(buffer);
-      digitalWrite(18,HIGH);
-      digitalWrite(19,HIGH);
-      digitalWrite(20,HIGH);
-      digitalWrite(21,HIGH);
-
-      delay(1000);
-      Serial.println("OFF");
-      digitalWrite(18,LOW);
-      digitalWrite(19,LOW);
-      digitalWrite(20,LOW);
-      digitalWrite(21,LOW);
-      delay(1000);
-      counter--;
-    }
-    Serial.println("==== digital out test is finished.\n");
-  } else {
-    Serial.println("==== digital out test was skipped.\n");
-  }
 }
 
 void checkAnalogRead(){
@@ -449,10 +495,9 @@ void setup() {
   }
 
   //Pin initialize
-  pinMode(18, OUTPUT);
-  pinMode(19, OUTPUT);
-  pinMode(20, OUTPUT);
-  pinMode(21, OUTPUT);
+  pinMode(ENB1, OUTPUT);
+  pinMode(ENB2, OUTPUT);
+
 
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
 
@@ -507,8 +552,8 @@ void setup() {
   move_nnbFile();
   uploadNNB();
   camImagePost();
-  checkDigitalOut();
   checkAnalogRead();
+  checkDrive();
 }
 
 

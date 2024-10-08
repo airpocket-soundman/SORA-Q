@@ -20,27 +20,27 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-//#define  AP_SSID        "J00WLN1305A"
-//#define  PASSPHRASE     "m1n0ru0869553434@LAN"
+#define WORK //HOME or WORK
 
-//#define  AP_SSID        "SSID:J00WLN2206A_EXT2.4_2"
-//#define  PASSPHRASE     "o86q556264@CP"
-
+#ifdef HOME
 #define  AP_SSID        "kumakero2.4"
 #define  PASSPHRASE     "4roses6126"
-
-//#define  HTTP_SRVR_IP  "192.168.1.65"
 #define  HTTP_SRVR_IP   "192.168.50.104"
-#define  HTTP_PORT      "1880"
+#define  MQTT_SRVR      "192.168.50.104"
 
+#else
+#define  AP_SSID        "J00WLN1305A"
+#define  PASSPHRASE     "m1n0ru0869553434@LAN"
+#define  HTTP_SRVR_IP   "192.168.1.65"
+#define  MQTT_SRVR      "192.168.1.65"
+#endif
+
+#define  HTTP_PORT      "1880"
 #define  HTTP_GET_PATH  "/getdata"
 #define  HTTP_POST_PATH "/postdata"
 
-//#define  MQTT_SRVR     "192.168.1.65"
-#define  MQTT_SRVR     "192.168.50.104"
 #define  MQTT_PORT     "1883"
 #define  MQTT_CLI_ID   "Telit_Device_pub"
-
 #define  MQTT_TOPIC1   "fromNodeRed"
 
 #endif /*_CONFIG_H_*/
