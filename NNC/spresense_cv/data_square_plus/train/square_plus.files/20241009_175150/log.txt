@@ -1,0 +1,32 @@
+2024-10-09 17:51:50,667 Training process is started.
+python "C:\Users\DS1DPC2003M\Desktop\tool\neural_network_console3.10\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" train
+	-c "D:\GitHub\SORA-Q\NNC\spresense_cv\data_square_plus\train\square_plus.files\20241009_175150\net.nntxt"
+	-o "D:\GitHub\SORA-Q\NNC\spresense_cv\data_square_plus\train\square_plus.files\20241009_175150"
+2024-10-09 17:51:51,927 [nnabla]: [CALLBACK]: Exec train on local
+2024-10-09 17:51:51,939 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-10-09 17:51:51,940 [nnabla]: Creating cache data for "D:\GitHub\SORA-Q\NNC\spresense_cv\dataset6_square_plus\train.csv"
+2024-10-09 17:51:52,021 [nnabla]: Creating cache data for "D:\GitHub\SORA-Q\NNC\spresense_cv\dataset6_square_plus\test.csv"
+2024-10-09 17:51:52,064 [nnabla]: Train with contexts ['cpu']
+2024-10-09 17:51:52,087 [nnabla]: Training epoch 1 of 100 begin
+2024-10-09 17:51:52,088 [nnabla]: ctx passed to scheduler doesn't have cuda/cudnn backend. lms scheduler will not be used.
+2024-10-09 17:51:52,088 [nnabla]: ctx passed to scheduler doesn't have cuda/cudnn backend. lms scheduler will not be used.
+2024-10-09 17:51:52,182 [nnabla]: epoch 1 of 100 cost=0.863389  {train_error=0.653317, valid_error=1.602632} time=(0.0s /3.8s) 
+2024-10-09 17:51:52,238 [nnabla]: epoch 2 of 100 cost=0.824402  {train_error=0.795709, valid_error=0.625791} time=(0.1s /6.4s) 
+2024-10-09 17:51:52,282 [nnabla]: epoch 3 of 100 cost=0.801351  {train_error=1.205971, valid_error=0.727230} time=(0.2s /6.1s) 
+2024-10-09 17:51:52,329 [nnabla]: epoch 4 of 100 cost=0.770185  {train_error=1.197257, valid_error=0.918279} time=(0.2s /5.7s) 
+2024-10-09 17:51:52,390 [nnabla]: epoch 5 of 100 cost=0.767365  {train_error=1.093569, valid_error=0.623536} time=(0.3s /5.5s) 
+2024-10-09 17:51:52,427 [nnabla]: epoch 6 of 100 cost=0.744263  time=(0.3s /5.6s) 
+2024-10-09 17:51:52,458 [nnabla]: epoch 7 of 100 cost=0.682405  time=(0.4s /5.3s) 
+2024-10-09 17:51:52,491 [nnabla]: epoch 8 of 100 cost=0.699351  time=(0.4s /5.0s) 
+2024-10-09 17:51:52,524 [nnabla]: epoch 9 of 100 cost=0.686232  time=(0.4s /4.8s) 
+2024-10-09 17:51:52,589 [nnabla]: epoch 10 of 100 cost=0.685235  {train_error=0.668236, valid_error=0.589677} time=(0.5s /4.7s) 
+2024-10-09 17:51:52,623 [nnabla]: epoch 11 of 100 cost=0.670165  time=(0.5s /4.9s) 
+2024-10-09 17:51:52,660 [nnabla]: epoch 12 of 100 cost=0.658858  time=(0.6s /4.7s) 
+2024-10-09 17:51:52,694 [nnabla]: epoch 13 of 100 cost=0.691184  time=(0.6s /4.7s) 
+2024-10-09 17:51:52,727 [nnabla]: epoch 14 of 100 cost=0.659779  time=(0.6s /4.6s) 
+2024-10-09 17:51:52,759 [nnabla]: epoch 15 of 100 cost=0.661266  time=(0.7s /4.5s) 
+2024-10-09 17:51:52,792 [nnabla]: epoch 16 of 100 cost=0.639108  time=(0.7s /4.4s) 
+2024-10-09 17:51:52,826 [nnabla]: epoch 17 of 100 cost=0.650269  time=(0.7s /4.3s) 
+2024-10-09 17:51:52,860 [nnabla]: epoch 18 of 100 cost=0.635354  time=(0.8s /4.3s) 
+2024-10-09 17:51:52,894 [nnabla]: epoch 19 of 100 cost=0.652285  time=(0.8s /4.2s) 
+2024-10-09 17:51:52,941 [nnabla]: epoch 20 of 100 cost=0.634003  {train_error=0.584015, valid_error=0.626719} time=(0.8s /4.2s) 

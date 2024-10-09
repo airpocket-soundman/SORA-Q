@@ -1,0 +1,10 @@
+,y'__0,y'__1,Recall
+y:label=0,23,33,0.4107
+y:label=1,20,30,0.6
+Precision,0.5348,0.4761,
+F-Measures,0.4646,0.5309,
+,,,
+Accuracy,0.5,,
+Avg.Precision,0.5055,,
+Avg.Recall,0.5053,,
+Avg.F-Measures,0.4977,,

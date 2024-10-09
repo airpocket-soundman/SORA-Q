@@ -1,0 +1,12 @@
+2024-10-09 17:49:10,224 Evaluation process is started.
+python "C:\Users\DS1DPC2003M\Desktop\tool\neural_network_console3.10\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" forward
+	-c "D:\GitHub\SORA-Q\NNC\spresense_cv\data_square_plus\train\square_plus.files\20241009_174902\results.nnp"
+	-d "D:\GitHub\SORA-Q\NNC\spresense_cv\dataset6_square_plus\test.csv"
+	-o "D:\GitHub\SORA-Q\NNC\spresense_cv\data_square_plus\train\square_plus.files\20241009_174902"
+	--replace_path
+2024-10-09 17:49:11,336 [nnabla]: [CALLBACK]: Exec forward on local
+2024-10-09 17:49:11,353 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-10-09 17:49:11,394 [nnabla]: data 64 / 106
+2024-10-09 17:49:11,410 [nnabla]: data 106 / 106
+2024-10-09 17:49:11,419 [nnabla]: Forward Completed.
+NNabla command line interface (Version:1.39.0.dev1, Build:231224031435, Callback:NNabla SSH callback module.)
