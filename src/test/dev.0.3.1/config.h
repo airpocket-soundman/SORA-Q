@@ -20,7 +20,7 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-#define HOME //HOME, HOME3A. WORK, WORK3A or NOTE3A
+#define WORK //HOME or WORK
 
 #ifdef HOME
 #define  AP_SSID        "kumakero2.4"
@@ -28,31 +28,11 @@
 #define  HTTP_SRVR_IP   "192.168.50.104"
 #define  MQTT_SRVR      "192.168.50.104"
 
-#ifdef HOME3A
-#define  AP_SSID        "airpocekt"
-#define  PASSPHRASE     "openpass"
-#define  HTTP_SRVR_IP   "192.168.50.105"
-#define  MQTT_SRVR      "192.168.50.105"
-
-#elif defined(WORK)
+#else
 #define  AP_SSID        "J00WLN1305A"
 #define  PASSPHRASE     "m1n0ru0869553434@LAN"
 #define  HTTP_SRVR_IP   "192.168.1.65"
 #define  MQTT_SRVR      "192.168.1.65"
-
-#define  AP_SSID        "airpocekt"
-#define  PASSPHRASE     "openpass"
-#define  HTTP_SRVR_IP   "192.168.1.56"
-#define  MQTT_SRVR      "192.168.1.56"
-
-#elif defined(NOTE)
-#define  AP_SSID        "airpocekt"
-#define  PASSPHRASE     "openpass"
-#define  HTTP_SRVR_IP   "192.168.137.234"
-#define  MQTT_SRVR      "192.168.137.234"
-
-#else
-#error "No configuration defined. Please define HOME, WORK, or NOTE."
 #endif
 
 #define  HTTP_PORT      "1880"

@@ -4,6 +4,7 @@
  * ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
  * Ver.0.2.0 MQTT受信追加
  * Ver.0.3.0 motor_handler追加
+ * Ver.0.3.1 MQTT複数トピック
  */
 
 char version[] = "Ver.0.3.0";
@@ -26,10 +27,13 @@ char version[] = "Ver.0.3.0";
 
 #define AIN1 A2       //左車輪エンコーダ
 #define AIN2 A3       //右車輪エンコーダ
-#define PWM1 21       //左車輪出力
-#define PWM2 19       //右車輪出力
-#define ENB1 20       //左車輪方向
-#define ENB2 18       //右車輪方向
+#define PWM_LEFT 21       //左車輪出力
+#define PWM_RIGHT 19       //右車輪出力
+#define ENB_LEFT 20       //左車輪方向
+#define ENB_RIGHT 18       //右車輪方向
+#define PHOTO_REFLECTOR_THRETHOLD_LEFT  200
+#define PHOTO_REFLECTOR_THRETHOLD_RIGHT 200
+
 
 const uint16_t RECEIVE_PACKET_SIZE = 1500;
 uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
@@ -39,6 +43,18 @@ char nnbFile[] = "airpocket_newlogo.jpg";
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 //char nnbFile[] = "slim.nnb";
+
+// test mode on/off
+bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
+bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
+bool analogReadTest = false;
+bool driveTest      = true;
+
+// out put mode on/off
+bool photo_reflector_out = true;
+
+bool photo_reflector_left   = false;
+bool photo_reflector_right  = false;
 
 String param1, param2, param3, param4, param5, param6;
 
@@ -52,22 +68,29 @@ MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
 bool served = false;
 MQTTGS2200_Mqtt mqtt;
 
-// test mode on/off
-bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
-bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
-bool analogReadTest = false;
-bool driveTest      = true;
+
 
 
 void motor_handler(int left_speed, int right_speed){
   char buffer[30];  // 十分なサイズのバッファを用意
   snprintf(buffer, sizeof(buffer), "SET left: %3d, Right: %3d", left_speed, right_speed);
   Serial.println(buffer);
-  analogWrite(PWM1,map(abs(left_speed),  0, 100, 0, 255));
-  analogWrite(PWM2,map(abs(right_speed), 0, 100, 0, 255));
-  digitalWrite(ENB1,(left_speed  >= 0));
-  digitalWrite(ENB2,(right_speed >= 0));
+  analogWrite(PWM_LEFT,map(abs(left_speed),  0, 100, 0, 255));
+  analogWrite(PWM_RIGHT,map(abs(right_speed), 0, 100, 0, 255));
+  digitalWrite(ENB_LEFT,(left_speed  >= 0));
+  digitalWrite(ENB_RIGHT,(right_speed >= 0));
 }
+
+void read_photo_reflector(){
+  photo_reflector_left  = (analogRead(A2) >= PHOTO_REFLECTOR_THRETHOLD_LEFT);
+  photo_reflector_right = (analogRead(A3) >= PHOTO_REFLECTOR_THRETHOLD_RIGHT);
+  if (photo_reflector_out){
+    char buffer[30];
+    sprintf(buffer, "photo reflector value  LEFT = %d / RIGHT = %d", photo_reflector_left, photo_reflector_right);
+    Serial.println(buffer);
+  }
+}
+
 
 void checkDrive(){
 
@@ -81,46 +104,46 @@ void checkDrive(){
       motor_handler(255,255);
       delay(10000);
       Serial.println("PWM:128  ENB:HIGH");
-      analogWrite(PWM1,128);
-      analogWrite(PWM2,128);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
+      analogWrite(PWM_LEFT ,  128);
+      analogWrite(PWM_RIGHT,  128);
+      digitalWrite(ENB_LEFT,  HIGH);
+      digitalWrite(ENB_RIGHT, HIGH);
       delay(10000);
       Serial.println("PWM: 64  ENB:HIGH");
-      analogWrite(PWM1,64);
-      analogWrite(PWM2,64);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
+      analogWrite(PWM_LEFT,   64);
+      analogWrite(PWM_RIGHT,  64);
+      digitalWrite(ENB_LEFT,  HIGH);
+      digitalWrite(ENB_RIGHT, HIGH);
       delay(10000);
       Serial.println("PWM:  0  ENB:HIGH");
-      analogWrite(PWM1,32);
-      analogWrite(PWM2,32);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
+      analogWrite(PWM_LEFT,   32);
+      analogWrite(PWM_RIGHT,  32);
+      digitalWrite(ENB_LEFT,  HIGH);
+      digitalWrite(ENB_RIGHT, HIGH);
       delay(10000);
       Serial.println("PWM:255  ENB:LOW");
-      analogWrite(PWM1,255);
-      analogWrite(PWM2,255);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
+      analogWrite(PWM_LEFT,   255);
+      analogWrite(PWM_RIGHT,  255);
+      digitalWrite(ENB_LEFT,  LOW);
+      digitalWrite(ENB_RIGHT, LOW);
       delay(10000);
       Serial.println("PWM:128  ENB:LOW");
-      analogWrite(PWM1,128);
-      analogWrite(PWM2,128);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
+      analogWrite(PWM_LEFT,   128);
+      analogWrite(PWM_RIGHT,  128);
+      digitalWrite(ENB_LEFT,  LOW);
+      digitalWrite(ENB_RIGHT, LOW);
       delay(10000);
       Serial.println("PWM: 64  ENB:LOW");
-      analogWrite(PWM1,64);
-      analogWrite(PWM2,64);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
+      analogWrite(PWM_LEFT,   64);
+      analogWrite(PWM_RIGHT,  64);
+      digitalWrite(ENB_LEFT,  LOW);
+      digitalWrite(ENB_RIGHT, LOW);
       delay(10000);
       Serial.println("PWM:  0  ENB:LOW");
-      analogWrite(PWM1,32);
-      analogWrite(PWM2,32);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
+      analogWrite(PWM_LEFT,   32);
+      analogWrite(PWM_RIGHT,  32);
+      digitalWrite(ENB_LEFT,  LOW);
+      digitalWrite(ENB_RIGHT, LOW);
       delay(10000);
       counter--;
     }
@@ -503,8 +526,8 @@ void setup() {
   }
 
   //Pin initialize
-  pinMode(ENB1, OUTPUT);
-  pinMode(ENB2, OUTPUT);
+  pinMode(ENB_LEFT, OUTPUT);
+  pinMode(ENB_RIGHT, OUTPUT);
 
 
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
@@ -571,6 +594,7 @@ void loop() {
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("loop");
   checkMQTTtopic();
+  void read_photo_reflector();
 
 
 				
