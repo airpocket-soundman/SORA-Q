@@ -7,7 +7,7 @@
  * Ver.0.3.1 MQTT複数トピック
  */
 
-char version[] = "Ver.0.3.0";
+char version[] = "Ver.0.3.1";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -45,10 +45,10 @@ char flashFolder[] = "data/";
 //char nnbFile[] = "slim.nnb";
 
 // test mode on/off
-bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
+bool imgPostTest    = false;    //イメージ撮影とhttp post requestのテスト
 bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
 bool analogReadTest = false;
-bool driveTest      = true;
+bool driveTest      = false;
 
 // out put mode on/off
 bool photo_reflector_out = true;
@@ -84,6 +84,7 @@ void motor_handler(int left_speed, int right_speed){
 void read_photo_reflector(){
   photo_reflector_left  = (analogRead(A2) >= PHOTO_REFLECTOR_THRETHOLD_LEFT);
   photo_reflector_right = (analogRead(A3) >= PHOTO_REFLECTOR_THRETHOLD_RIGHT);
+  Serial.println("read photo reflector");
   if (photo_reflector_out){
     char buffer[30];
     sprintf(buffer, "photo reflector value  LEFT = %d / RIGHT = %d", photo_reflector_left, photo_reflector_right);
@@ -594,7 +595,7 @@ void loop() {
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("loop");
   checkMQTTtopic();
-  void read_photo_reflector();
+  read_photo_reflector();
 
 
 				
