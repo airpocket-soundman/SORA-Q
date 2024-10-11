@@ -38,7 +38,7 @@ DNNRT dnnrt;
 DNNVariable input(DNN_IMG_W*DNN_IMG_H);
   
 //static uint8_t const label[2]= {0,1};
-static String const label[2]= {"EMPTY", "CONE"};
+static String const label[5]= {"EMPTY", "CONE1", "CONE2", "CONE3", "CONE4"};
 
 void putStringOnLcd(String str, int color) {
   int len = str.length();
@@ -116,8 +116,9 @@ void CamCB(CamImage img) {
   tft.drawRGBBitmap(0, 0, (uint16_t *)img.getImgBuff(), 320, 224);
   //text描画
   int index = output.maxIndex();
-  //gStrResult = String(label[index]) + String(":") + String(output[index]);
-  gStrResult = String(label[0]) + String(":") + String(output[0]) + String(" / ") + String(label[1]) + String(":") + String(output[1]);
+  gStrResult = String(label[index]) + String(":") + String(output[index]);
+  //gStrResult = String(label[0]) + String(":") + String(output[0]) + String(" / ") + String(label[1]) + String(":") + String(output[1]);
+  //gStrResult = String(output[0]) + String(":") + String(output[1]) + String(":") + String(output[2]) + String(":") + String(output[3]) + String(":") + String(output[4]);
   Serial.println(gStrResult);
   putStringOnLcd(gStrResult, ILI9341_YELLOW);
 
