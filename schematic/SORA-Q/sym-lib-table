@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "SPRESENSE")(type "KiCad")(uri "${KIPRJMOD}/SPRESENSE.kicad_sym")(options "")(descr ""))
+)
