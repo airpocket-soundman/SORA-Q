@@ -5,6 +5,7 @@
  * Ver.0.2.0 MQTT受信追加
  * Ver.0.3.0 motor_handler追加
  * Ver.0.3.1 モータードライバmode 0化
+ * Ver.0.3.2 開閉ロック制御関数追加
  */
 
 char version[] = "Ver.0.3.1";
