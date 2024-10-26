@@ -1,0 +1,46 @@
+2024-10-26 15:56:09,677 Evaluation process is started.
+python "C:\Users\DS1DPC2003M\Desktop\tool\neural_network_console3.10\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" forward
+	-c "D:\GitHub\SORA-Q\NNC\spresense_cv\24_class_image\training\01\24classes_mono.files\20241026_155423\results.nnp"
+	-d "C:\Users\DS1DPC2003M\Desktop\24_classes_data_set_mono_28x28\train.csv"
+	-o "D:\GitHub\SORA-Q\NNC\spresense_cv\24_class_image\training\01\24classes_mono.files\20241026_155423"
+	--replace_path
+2024-10-26 15:56:10,853 [nnabla]: [CALLBACK]: Exec forward on local
+2024-10-26 15:56:10,870 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-10-26 15:56:10,956 [nnabla]: data 64 / 2278
+2024-10-26 15:56:10,976 [nnabla]: data 128 / 2278
+2024-10-26 15:56:10,995 [nnabla]: data 192 / 2278
+2024-10-26 15:56:11,016 [nnabla]: data 256 / 2278
+2024-10-26 15:56:11,035 [nnabla]: data 320 / 2278
+2024-10-26 15:56:11,055 [nnabla]: data 384 / 2278
+2024-10-26 15:56:11,073 [nnabla]: data 448 / 2278
+2024-10-26 15:56:11,092 [nnabla]: data 512 / 2278
+2024-10-26 15:56:11,111 [nnabla]: data 576 / 2278
+2024-10-26 15:56:11,130 [nnabla]: data 640 / 2278
+2024-10-26 15:56:11,150 [nnabla]: data 704 / 2278
+2024-10-26 15:56:11,168 [nnabla]: data 768 / 2278
+2024-10-26 15:56:11,187 [nnabla]: data 832 / 2278
+2024-10-26 15:56:11,206 [nnabla]: data 896 / 2278
+2024-10-26 15:56:11,224 [nnabla]: data 960 / 2278
+2024-10-26 15:56:11,243 [nnabla]: data 1024 / 2278
+2024-10-26 15:56:11,262 [nnabla]: data 1088 / 2278
+2024-10-26 15:56:11,281 [nnabla]: data 1152 / 2278
+2024-10-26 15:56:11,300 [nnabla]: data 1216 / 2278
+2024-10-26 15:56:11,319 [nnabla]: data 1280 / 2278
+2024-10-26 15:56:11,337 [nnabla]: data 1344 / 2278
+2024-10-26 15:56:11,356 [nnabla]: data 1408 / 2278
+2024-10-26 15:56:11,375 [nnabla]: data 1472 / 2278
+2024-10-26 15:56:11,395 [nnabla]: data 1536 / 2278
+2024-10-26 15:56:11,414 [nnabla]: data 1600 / 2278
+2024-10-26 15:56:11,432 [nnabla]: data 1664 / 2278
+2024-10-26 15:56:11,450 [nnabla]: data 1728 / 2278
+2024-10-26 15:56:11,470 [nnabla]: data 1792 / 2278
+2024-10-26 15:56:11,489 [nnabla]: data 1856 / 2278
+2024-10-26 15:56:11,509 [nnabla]: data 1920 / 2278
+2024-10-26 15:56:11,527 [nnabla]: data 1984 / 2278
+2024-10-26 15:56:11,546 [nnabla]: data 2048 / 2278
+2024-10-26 15:56:11,565 [nnabla]: data 2112 / 2278
+2024-10-26 15:56:11,583 [nnabla]: data 2176 / 2278
+2024-10-26 15:56:11,602 [nnabla]: data 2240 / 2278
+2024-10-26 15:56:11,619 [nnabla]: data 2278 / 2278
+2024-10-26 15:56:11,632 [nnabla]: Forward Completed.
+NNabla command line interface (Version:1.39.0.dev1, Build:231224031435, Callback:NNabla SSH callback module.)

@@ -133,7 +133,7 @@ void setup()
 
   //TFT
   tft.begin();
-  tft.setRotation(1);
+  tft.setRotation(3);
   
   CamErr err;
 

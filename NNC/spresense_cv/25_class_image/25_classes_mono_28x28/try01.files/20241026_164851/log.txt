@@ -1,0 +1,20 @@
+2024-10-26 16:48:51,218 Training process is started.
+python "C:\Users\DS1DPC2003M\Desktop\tool\neural_network_console3.10\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" train
+	-c "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\try01.files\20241026_164851\net.nntxt"
+	-o "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\try01.files\20241026_164851"
+2024-10-26 16:48:52,465 [nnabla]: [CALLBACK]: Exec train on local
+2024-10-26 16:48:52,478 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-10-26 16:48:52,479 [nnabla]: Creating cache data for "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\train.csv"
+2024-10-26 16:48:52,915 [nnabla]: Creating cache data for "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\train.csv"
+2024-10-26 16:48:53,339 [nnabla]: Train with contexts ['cpu']
+2024-10-26 16:48:53,357 [nnabla]: Training epoch 1 of 200 begin
+2024-10-26 16:48:53,357 [nnabla]: ctx passed to scheduler doesn't have cuda/cudnn backend. lms scheduler will not be used.
+2024-10-26 16:48:53,357 [nnabla]: ctx passed to scheduler doesn't have cuda/cudnn backend. lms scheduler will not be used.
+2024-10-26 16:48:55,005 [nnabla]: epoch 1 of 200 cost=3.391828  {train_error=2.784924, valid_error=2.787704} time=(1.0s /193.4s) 
+2024-10-26 16:48:56,587 [nnabla]: epoch 2 of 200 cost=2.742748  {train_error=2.261923, valid_error=2.260878} time=(2.6s /259.6s) 
+2024-10-26 16:48:58,156 [nnabla]: epoch 3 of 200 cost=2.443007  {train_error=1.944775, valid_error=1.943137} time=(4.2s /278.7s) 
+2024-10-26 16:48:59,728 [nnabla]: epoch 4 of 200 cost=2.262951  {train_error=1.723415, valid_error=1.721905} time=(5.8s /288.5s) 
+2024-10-26 16:49:01,283 [nnabla]: epoch 5 of 200 cost=2.155058  {train_error=1.553869, valid_error=1.558996} time=(7.3s /292.9s) 
+2024-10-26 16:49:02,242 [nnabla]: epoch 6 of 200 cost=2.050253  time=(8.9s /296.1s) 
+2024-10-26 16:49:03,196 [nnabla]: epoch 7 of 200 cost=1.977836  time=(9.8s /281.1s) 
+2024-10-26 16:49:04,167 [nnabla]: epoch 8 of 200 cost=1.878616  time=(10.8s /270.2s) 

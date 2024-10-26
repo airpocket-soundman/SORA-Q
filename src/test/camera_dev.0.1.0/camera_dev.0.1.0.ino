@@ -135,19 +135,55 @@ void setup() {
 
 void loop() {
   if (!bButtonPressed) return;
-  Serial.println("button pressed");
+  
+  Serial.println("Button pressed");
   digitalWrite(LED0, HIGH);
-  theCamera.startStreaming(false, CamCB);  // streaming off
+  
+  // カメラのストリーミングをオフ
+  theCamera.startStreaming(false, CamCB);
+  Serial.println("Streaming stopped for capture");
+
   CamImage img = theCamera.takePicture();
+
   if (img.isAvailable()) {
-      char filename[16] = {0};
-      sprintf(filename, "PICT%03d.JPG", gCounter);
-      File myFile = theSD.open(filename,FILE_WRITE);
+    char filename[16] = {0};
+    sprintf(filename, "PICT%03d.JPG", gCounter);
+
+    // 古いファイルが存在する場合は削除
+    if (theSD.exists(filename)) {
+      if (theSD.remove(filename)) {
+        Serial.println("Previous file removed successfully");
+      } else {
+        Serial.println("Failed to remove previous file");
+      }
+    }
+
+    // 新しいファイルを作成して画像データを書き込み
+    File myFile = theSD.open(filename, FILE_WRITE | O_TRUNC);
+    if (myFile) {
+      Serial.print("Saving image to ");
+      Serial.println(filename);
+
       myFile.write(img.getImgBuff(), img.getImgSize());
-      myFile.close();
-      ++gCounter;
+      myFile.flush();  // バッファをフラッシュして書き込みを確定
+      myFile.close();  // ファイルを閉じる
+      delay(100);      // 書き込み後のディレイ
+
+      Serial.println("Image saved successfully");
+      ++gCounter;  // 次の画像のためにカウンターをインクリメント
+    } else {
+      Serial.println("Failed to open file for writing");
+    }
+  } else {
+    Serial.println("Failed to capture image");
   }
+
+  // 状態をリセット
   bButtonPressed = false;
-  theCamera.startStreaming(true, CamCB);  // streaming on
+  
+  // カメラのストリーミングを再開
+  theCamera.startStreaming(true, CamCB);
+  Serial.println("Streaming restarted");
+  
   digitalWrite(LED0, LOW);
 }

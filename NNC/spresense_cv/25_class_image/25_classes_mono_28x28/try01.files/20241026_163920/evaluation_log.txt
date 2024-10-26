@@ -1,0 +1,48 @@
+2024-10-26 16:41:14,121 Evaluation process is started.
+python "C:\Users\DS1DPC2003M\Desktop\tool\neural_network_console3.10\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" forward
+	-c "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\try01.files\20241026_163920\results.nnp"
+	-d "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\train.csv"
+	-o "D:\GitHub\SORA-Q\NNC\spresense_cv\25_class_image\25_classes_mono_28x28\try01.files\20241026_163920"
+	--replace_path
+2024-10-26 16:41:15,336 [nnabla]: [CALLBACK]: Exec forward on local
+2024-10-26 16:41:15,354 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-10-26 16:41:15,441 [nnabla]: data 64 / 2376
+2024-10-26 16:41:15,461 [nnabla]: data 128 / 2376
+2024-10-26 16:41:15,479 [nnabla]: data 192 / 2376
+2024-10-26 16:41:15,498 [nnabla]: data 256 / 2376
+2024-10-26 16:41:15,516 [nnabla]: data 320 / 2376
+2024-10-26 16:41:15,536 [nnabla]: data 384 / 2376
+2024-10-26 16:41:15,556 [nnabla]: data 448 / 2376
+2024-10-26 16:41:15,575 [nnabla]: data 512 / 2376
+2024-10-26 16:41:15,594 [nnabla]: data 576 / 2376
+2024-10-26 16:41:15,612 [nnabla]: data 640 / 2376
+2024-10-26 16:41:15,632 [nnabla]: data 704 / 2376
+2024-10-26 16:41:15,651 [nnabla]: data 768 / 2376
+2024-10-26 16:41:15,670 [nnabla]: data 832 / 2376
+2024-10-26 16:41:15,689 [nnabla]: data 896 / 2376
+2024-10-26 16:41:15,708 [nnabla]: data 960 / 2376
+2024-10-26 16:41:15,727 [nnabla]: data 1024 / 2376
+2024-10-26 16:41:15,746 [nnabla]: data 1088 / 2376
+2024-10-26 16:41:15,765 [nnabla]: data 1152 / 2376
+2024-10-26 16:41:15,785 [nnabla]: data 1216 / 2376
+2024-10-26 16:41:15,803 [nnabla]: data 1280 / 2376
+2024-10-26 16:41:15,821 [nnabla]: data 1344 / 2376
+2024-10-26 16:41:15,840 [nnabla]: data 1408 / 2376
+2024-10-26 16:41:15,859 [nnabla]: data 1472 / 2376
+2024-10-26 16:41:15,878 [nnabla]: data 1536 / 2376
+2024-10-26 16:41:15,896 [nnabla]: data 1600 / 2376
+2024-10-26 16:41:15,915 [nnabla]: data 1664 / 2376
+2024-10-26 16:41:15,933 [nnabla]: data 1728 / 2376
+2024-10-26 16:41:15,952 [nnabla]: data 1792 / 2376
+2024-10-26 16:41:15,972 [nnabla]: data 1856 / 2376
+2024-10-26 16:41:15,989 [nnabla]: data 1920 / 2376
+2024-10-26 16:41:16,009 [nnabla]: data 1984 / 2376
+2024-10-26 16:41:16,029 [nnabla]: data 2048 / 2376
+2024-10-26 16:41:16,048 [nnabla]: data 2112 / 2376
+2024-10-26 16:41:16,065 [nnabla]: data 2176 / 2376
+2024-10-26 16:41:16,086 [nnabla]: data 2240 / 2376
+2024-10-26 16:41:16,107 [nnabla]: data 2304 / 2376
+2024-10-26 16:41:16,127 [nnabla]: data 2368 / 2376
+2024-10-26 16:41:16,144 [nnabla]: data 2376 / 2376
+2024-10-26 16:41:16,154 [nnabla]: Forward Completed.
+NNabla command line interface (Version:1.39.0.dev1, Build:231224031435, Callback:NNabla SSH callback module.)
