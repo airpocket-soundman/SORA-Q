@@ -127,8 +127,8 @@ void setup() {
   }
 
   theCamera.setStillPictureImageFormat(
-    //CAM_IMGSIZE_QVGA_H ,CAM_IMGSIZE_QVGA_V
-    CAM_IMGSIZE_QVGA_H ,CAM_IMGSIZE_QVGA_H
+    CAM_IMGSIZE_QVGA_H ,CAM_IMGSIZE_QVGA_V
+    //CAM_IMGSIZE_QVGA_H ,CAM_IMGSIZE_QVGA_H
    ,CAM_IMAGE_PIX_FMT_JPG);
 
   attachInterrupt(digitalPinToInterrupt(intPin) ,changeState ,FALLING);

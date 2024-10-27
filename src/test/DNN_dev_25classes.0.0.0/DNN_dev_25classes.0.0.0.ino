@@ -32,6 +32,8 @@ SDClass theSD;
 
 Adafruit_ILI9341 tft = Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
 
+float threshold = 0.2;
+
 uint8_t buf[DNN_IMG_W*DNN_IMG_H];
 
 DNNRT dnnrt;
@@ -75,36 +77,45 @@ void drawBox(uint16_t* imgBuf) {
 
 
 void CamCB(CamImage img) {
-
   if (!img.isAvailable()) {
     Serial.println("Image is not available. Try again");
     return;
   }
 
   CamImage small;
-  CamErr err = img.clipAndResizeImageByHW(small
-                     , CAM_CLIP_X, CAM_CLIP_Y
-                     , CAM_CLIP_X + CAM_CLIP_W -1
-                     , CAM_CLIP_Y + CAM_CLIP_H -1
-                     , DNN_IMG_W, DNN_IMG_H);
-  if (!small.isAvailable()){
+  CamErr err = img.clipAndResizeImageByHW(small, 
+                                          CAM_CLIP_X, CAM_CLIP_Y, 
+                                          CAM_CLIP_X + CAM_CLIP_W - 1, 
+                                          CAM_CLIP_Y + CAM_CLIP_H - 1, 
+                                          DNN_IMG_W, DNN_IMG_H);
+  if (!small.isAvailable()) {
     putStringOnLcd("Clip and Resize Error:" + String(err), ILI9341_RED);
     return;
   }
 
   small.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
   uint16_t* tmp = (uint16_t*)small.getImgBuff();
-  //uint16_t* tmp = (uint16_t*)img.getImgBuff();
 
-  float *dnnbuf = input.data();
+  // RGBデータから輝度データを計算してDNNに入力
+  float* dnnbuf = input.data();
   float f_max = 0.0;
-  for (int n = 0; n < DNN_IMG_H*DNN_IMG_W; ++n) {
-    dnnbuf[n] = (float)((tmp[n] & 0x07E0) >> 5);
+  for (int n = 0; n < DNN_IMG_H * DNN_IMG_W; ++n) {
+    uint16_t pixel = tmp[n];
+    
+    // RGB成分を抽出
+    float red   = (float)((pixel & 0xF800) >> 11) * (255.0 / 31.0); // 5ビット赤
+    float green = (float)((pixel & 0x07E0) >> 5) * (255.0 / 63.0);  // 6ビット緑
+    float blue  = (float)(pixel & 0x001F) * (255.0 / 31.0);         // 5ビット青
+    
+    // 輝度を計算
+    dnnbuf[n] = 0.299 * red + 0.587 * green + 0.114 * blue;
+
+    // 最大値を記録（正規化に使用）
     if (dnnbuf[n] > f_max) f_max = dnnbuf[n];
   }
-  
-  /* normalization */
-  for (int n = 0; n < DNN_IMG_W*DNN_IMG_H; ++n) {
+
+  // 正規化
+  for (int n = 0; n < DNN_IMG_W * DNN_IMG_H; ++n) {
     dnnbuf[n] /= f_max;
   }
   
@@ -116,31 +127,32 @@ void CamCB(CamImage img) {
   img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
   uint16_t* imgBuf = (uint16_t*)img.getImgBuff(); 
 
-  //Box描画
+  // Box描画
   drawBox(imgBuf); 
-  //TFT描画
+  // TFT描画
   tft.drawRGBBitmap(0, 0, (uint16_t *)img.getImgBuff(), 320, 224);
-  //text描画
+  // text描画
   int index = output.maxIndex();
-  gStrResult = String(label[index]) + String(":") + String(output[index]);
-  //gStrResult = String(label[0]) + String(":") + String(output[0]) + String(" / ") + String(label[1]) + String(":") + String(output[1]);
-  //gStrResult = String(output[0]) + String(":") + String(output[1]) + String(":") + String(output[2]) + String(":") + String(output[3]) + String(":") + String(output[4]);
+
+  if (output[index] >= threshold){
+    gStrResult = String(label[index]) + String(":") + String(output[index]);
+  } else {
+    gStrResult = "not identify";
+  }
   Serial.println(gStrResult);
   putStringOnLcd(gStrResult, ILI9341_YELLOW);
 
-  //モード変更有無をチェック
-  if(index!=before_value){
-    ChangeModeFlag=true;
+  // モード変更有無をチェック
+  if(index != before_value) {
+    ChangeModeFlag = true;
   }
 
-  //更新
-  before_value=index;
-  //flag初期化
-  ChangeModeFlag=false;
- 
-
-
+  // 更新
+  before_value = index;
+  // flag初期化
+  ChangeModeFlag = false;
 }
+
 
 
 void setup() {   
@@ -171,4 +183,4 @@ void setup() {
 
 void loop() { 
 
-  }
+}
