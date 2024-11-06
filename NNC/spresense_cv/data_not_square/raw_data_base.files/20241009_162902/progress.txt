@@ -1,1 +1,0 @@
-epoch 80 average_load_matrix: [[0.0, 114.7]] (100.00%)
