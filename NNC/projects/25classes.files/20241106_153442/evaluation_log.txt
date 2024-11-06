@@ -1,0 +1,20 @@
+2024-11-06 15:37:33,468 Evaluation process is started.
+python "C:\Users\DS1DPC2003M\Desktop\tool\neural_network_console3.10\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" forward
+	-c "C:\Users\DS1DPC2003M\Desktop\sora-q_nnc\projects\25classes.files\20241106_153442\results.nnp"
+	-d "C:\Users\DS1DPC2003M\Desktop\sora-q_nnc\data_sets\25classes\test.csv"
+	-o "C:\Users\DS1DPC2003M\Desktop\sora-q_nnc\projects\25classes.files\20241106_153442"
+	--replace_path
+2024-11-06 15:37:34,699 [nnabla]: [CALLBACK]: Exec forward on local
+2024-11-06 15:37:34,743 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-11-06 15:37:34,815 [nnabla]: data 64 / 594
+2024-11-06 15:37:34,835 [nnabla]: data 128 / 594
+2024-11-06 15:37:34,854 [nnabla]: data 192 / 594
+2024-11-06 15:37:34,873 [nnabla]: data 256 / 594
+2024-11-06 15:37:34,893 [nnabla]: data 320 / 594
+2024-11-06 15:37:34,911 [nnabla]: data 384 / 594
+2024-11-06 15:37:34,930 [nnabla]: data 448 / 594
+2024-11-06 15:37:34,950 [nnabla]: data 512 / 594
+2024-11-06 15:37:34,968 [nnabla]: data 576 / 594
+2024-11-06 15:37:34,984 [nnabla]: data 594 / 594
+2024-11-06 15:37:34,995 [nnabla]: Forward Completed.
+NNabla command line interface (Version:1.39.0.dev1, Build:231224031435, Callback:NNabla SSH callback module.)
