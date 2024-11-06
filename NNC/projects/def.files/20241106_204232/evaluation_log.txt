@@ -1,0 +1,20 @@
+2024-11-06 20:46:36,819 Evaluation process is started.
+python "C:\Users\yamas\Desktop\tools\neural_network_console\libs\Python\Lib\site-packages\nnabla\utils\cli\cli.py" forward
+	-c "D:\GitHub\SORA-Q\NNC\projects\def.files\20241106_204232\results.nnp"
+	-d "C:\Users\yamas\Desktop\SLIM_NNC\data_sets\25classes_focus_padding\test.csv"
+	-o "D:\GitHub\SORA-Q\NNC\projects\def.files\20241106_204232"
+	--replace_path
+2024-11-06 20:46:37,344 [nnabla]: [CALLBACK]: Exec forward on local
+2024-11-06 20:46:37,356 [nnabla]: Using context "Context(backend=['cpu:float'], array_class='CpuCachedArray', device_id='')"
+2024-11-06 20:46:37,408 [nnabla]: data 64 / 636
+2024-11-06 20:46:37,433 [nnabla]: data 128 / 636
+2024-11-06 20:46:37,459 [nnabla]: data 192 / 636
+2024-11-06 20:46:37,484 [nnabla]: data 256 / 636
+2024-11-06 20:46:37,510 [nnabla]: data 320 / 636
+2024-11-06 20:46:37,536 [nnabla]: data 384 / 636
+2024-11-06 20:46:37,561 [nnabla]: data 448 / 636
+2024-11-06 20:46:37,587 [nnabla]: data 512 / 636
+2024-11-06 20:46:37,612 [nnabla]: data 576 / 636
+2024-11-06 20:46:37,638 [nnabla]: data 636 / 636
+2024-11-06 20:46:37,638 [nnabla]: Forward Completed.
+NNabla command line interface (Version:1.39.0.dev1, Build:231224031435, Callback:NNabla SSH callback module.)
