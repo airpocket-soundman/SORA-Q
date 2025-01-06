@@ -1,11 +1,18 @@
 /* SORA-Q projeckt                                  
- * ver.0.1.0 SDがある場合はFlashにファイルをコピーする
- * ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
- * ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
- * Ver.0.2.0 MQTT受信追加
- * Ver.0.3.0 motor_handler追加
- * Ver.0.3.1 モータードライバmode 0化
- * Ver.0.3.2 開閉ロック制御関数追加
+ ✔ ver.0.1.0 SDがある場合はFlashにファイルをコピーする
+ ✔ ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
+ ✔ ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
+ ✔ Ver.0.2.0 MQTT受信追加
+ ✔ Ver.0.3.0 motor_handler追加
+ ✔ Ver.0.3.1 モータードライバmode 0化
+ Ver.0.3.2 開閉ロック制御関数追加
+ Ver.0.3.3 MQTTによる車輪ロックON/OFF機能
+ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
+ Ver.0.4.0 クラス分類及追加
+ Ver.0.4.1 クラス分類後の画像送信
+ Ver.0.4.2 簡易物体検出ロジック追加
+ Ver.0.5.0 ラジコン走行
+ Ver.0.5.1 自動走行追加
  */
 
 char version[] = "Ver.0.3.1";
@@ -597,7 +604,7 @@ void setup() {
   uploadNNB();
   camImagePost();
   checkAnalogRead();
-  checkDrive();
+  //checkDrive();
 }
 
 
@@ -607,7 +614,7 @@ void loop() {
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("loop");
   checkMQTTtopic();
-  read_photo_reflector();
+  //read_photo_reflector();
 
 
 				
