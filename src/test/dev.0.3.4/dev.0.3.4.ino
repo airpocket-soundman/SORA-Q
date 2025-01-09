@@ -7,7 +7,7 @@
  ✔ Ver.0.3.1 モータードライバmode 0化
  ✔ Ver.0.3.2 開閉ロック制御関数追加
  ✔           MQTTによる車輪ロックON/OFF機能
- Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
+ ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
  Ver.0.4.0 クラス分類及追加
  Ver.0.4.1 クラス分類後の画像送信
  Ver.0.4.2 簡易物体検出ロジック追加
@@ -27,18 +27,19 @@ char version[] = "Ver.0.3.1";
 #include "config.h"
 #include <Flash.h>
 
-#define CONSOLE_BAUDRATE 57600
+#define CONSOLE_BAUDRATE    57600
 #define TOTAL_PICTURE_COUNT 1
-#define PICTURE_INTERVAL 1000
-#define FIRST_INTERVAL 3000
-#define SUBSCRIBE_TIMEOUT 60000	//ms
+#define PICTURE_INTERVAL    1000
+#define FIRST_INTERVAL      3000
+#define SUBSCRIBE_TIMEOUT   60000	//ms
+#define START_TIMER         10000 //ms
 
-#define AIN1 A2       //左車輪エンコーダ
-#define AIN2 A3       //右車輪エンコーダ
+#define AIN1        A2       //左車輪エンコーダ
+#define AIN2        A3       //右車輪エンコーダ
 #define IN1_LEFT    19       //左車輪出力
 #define IN1_RIGHT   21       //右車輪出力
-#define IN2_LEFT  18       //左車輪方向
-#define IN2_RIGHT 20       //右車輪方向
+#define IN2_LEFT    18       //左車輪方向
+#define IN2_RIGHT   20       //右車輪方向
 #define PHOTO_REFLECTOR_THRETHOLD_LEFT  100
 #define PHOTO_REFLECTOR_THRETHOLD_RIGHT 100
 
@@ -51,6 +52,10 @@ char nnbFile[] = "airpocket_newlogo.jpg";
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 //char nnbFile[] = "slim.nnb";
+
+
+// auto start on/off
+bool autoStart      = false;
 
 // test mode on/off
 bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
@@ -619,6 +624,12 @@ void setup() {
   camImagePost();
   checkAnalogRead();
   checkDrive();
+
+  if autoStart(){
+    delay(START_TIMER);
+    unlockWheels();
+    Serial.println("Begin Automatic Serch");
+  }
 }
 
 
@@ -629,6 +640,7 @@ void loop() {
   //Serial.println("loop");
   checkMQTTtopic();
   //read_photo_reflector();
+
 
 
 				

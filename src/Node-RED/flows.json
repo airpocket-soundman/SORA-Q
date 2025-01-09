@@ -1,0 +1,253 @@
+[
+    {
+        "id": "12cc179dfe3cb70c",
+        "type": "tab",
+        "label": "フロー 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "fc3c4c32c297df8f",
+        "type": "mqtt out",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "topic": "fromNodeRed",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "d2d5e28c77a52aa0",
+        "x": 560,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "3638232250ad821a",
+        "type": "inject",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "124,13444,29390,hello,dfa,128",
+        "payloadType": "str",
+        "x": 90,
+        "y": 160,
+        "wires": [
+            [
+                "fc3c4c32c297df8f"
+            ]
+        ]
+    },
+    {
+        "id": "bc2fd1af7223a29d",
+        "type": "inject",
+        "z": "12cc179dfe3cb70c",
+        "name": "lock wheels",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "lockWheels,13444,29390,hello,dfa,128",
+        "payloadType": "str",
+        "x": 110,
+        "y": 80,
+        "wires": [
+            [
+                "fc3c4c32c297df8f"
+            ]
+        ]
+    },
+    {
+        "id": "704da9817f809a8c",
+        "type": "http in",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "url": "/postdata",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 360,
+        "wires": [
+            [
+                "36a22490187daea2",
+                "3daf8a88f7caceb9",
+                "57cda11c135647c0",
+                "50bb74eb4d191b7d"
+            ]
+        ]
+    },
+    {
+        "id": "57cda11c135647c0",
+        "type": "image viewer",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "width": "640",
+        "data": "payload",
+        "dataType": "msg",
+        "active": true,
+        "x": 430,
+        "y": 400,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "36a22490187daea2",
+        "type": "change",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "data recieved",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 460,
+        "y": 360,
+        "wires": [
+            [
+                "0c83261f66763654"
+            ]
+        ]
+    },
+    {
+        "id": "0c83261f66763654",
+        "type": "http response",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 730,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "50bb74eb4d191b7d",
+        "type": "file",
+        "z": "12cc179dfe3cb70c",
+        "name": "",
+        "filename": "/home/minoru/Workspace/SORA-Q/test.jpg",
+        "filenameType": "str",
+        "appendNewline": false,
+        "createDir": false,
+        "overwriteFile": "true",
+        "encoding": "none",
+        "x": 450,
+        "y": 280,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "3daf8a88f7caceb9",
+        "type": "debug",
+        "z": "12cc179dfe3cb70c",
+        "name": "debug 26",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 740,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "dab23ee7f8e989db",
+        "type": "inject",
+        "z": "12cc179dfe3cb70c",
+        "name": "unlock wheels",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "unlockWheels,13444,29390,hello,dfa,128",
+        "payloadType": "str",
+        "x": 110,
+        "y": 120,
+        "wires": [
+            [
+                "fc3c4c32c297df8f"
+            ]
+        ]
+    },
+    {
+        "id": "d2d5e28c77a52aa0",
+        "type": "mqtt-broker",
+        "name": "central_server",
+        "broker": "192.168.1.65",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]
