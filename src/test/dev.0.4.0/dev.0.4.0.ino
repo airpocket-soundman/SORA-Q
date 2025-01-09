@@ -125,14 +125,14 @@ void read_photo_reflector(){
 void lockWheels(){
   Serial.println("lock wheels");
   motor_handler( -75,  -75);
-  delay(300);
+  delay(400);
   motor_handler(   0,    0);
 }
 
 void unlockWheels(){
   Serial.println("unlock wheels");
   motor_handler(  75,   75);
-  delay(300);
+  delay(400);
   motor_handler(   0,    0);
 }
 
@@ -625,7 +625,7 @@ void setup() {
   checkAnalogRead();
   checkDrive();
 
-  if autoStart(){
+  if (autoStart){
     delay(START_TIMER);
     unlockWheels();
     Serial.println("Begin Automatic Serch");
@@ -636,8 +636,8 @@ void setup() {
 
 
 void loop() {
-  //delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
-  //Serial.println("loop");
+  delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
+  Serial.println("loop");
   checkMQTTtopic();
   //read_photo_reflector();
 
