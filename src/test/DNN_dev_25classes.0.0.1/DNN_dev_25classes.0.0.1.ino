@@ -1,6 +1,7 @@
 /*
 ✔ Ver.0.0.0 推論実行
- Ver.0.0.1 推論時間計測、表示
+✔ Ver.0.0.1 推論時間計測、表示
+ Ver.0.0.2 postprocessを関数化
  Ver.0.1.0 大サイズ、2箇所推論
  Ver.0.2.0 中サイズ推論
  Ver.0.2.1 中サイズ2か所推論
@@ -39,7 +40,7 @@ SDClass theSD;
 #define DNN_IMG_H 28
 #define CAM_IMG_W 320
 #define CAM_IMG_H 240
-#define CAM_CLIP_X 0//104
+#define CAM_CLIP_X 96//96
 #define CAM_CLIP_Y 0//64
 #define CAM_CLIP_W 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
 #define CAM_CLIP_H 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
@@ -54,6 +55,11 @@ uint8_t buf[DNN_IMG_W*DNN_IMG_H];
 
 DNNRT dnnrt;
 DNNVariable input(DNN_IMG_W*DNN_IMG_H);
+
+//推論時間計測用
+unsigned long startMicros; // 処理開始時間を記録する変数
+unsigned long endMicros;   // 処理終了時間を記録する変数
+unsigned long elapsedTime;    // 処理時間を記録する変数
   
 //static uint8_t const label[2]= {0,1};
 static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_R3", 
@@ -92,12 +98,8 @@ void drawBox(uint16_t* imgBuf) {
 }
 
 
-void CamCB(CamImage img) {
-  if (!img.isAvailable()) {
-    Serial.println("Image is not available. Try again");
-    return;
-  }
-
+void preprocessImage(CamImage& img, DNNVariable& input) {
+  // 画像をクロップしてリサイズ
   CamImage small;
   CamErr err = img.clipAndResizeImageByHW(small, 
                                           CAM_CLIP_X, CAM_CLIP_Y, 
@@ -105,14 +107,16 @@ void CamCB(CamImage img) {
                                           CAM_CLIP_Y + CAM_CLIP_H - 1, 
                                           DNN_IMG_W, DNN_IMG_H);
   if (!small.isAvailable()) {
-    putStringOnLcd("Clip and Resize Error:" + String(err), ILI9341_RED);
+    Serial.println("Error: Clip and Resize failed.");
+    putStringOnLcd("Clip and Resize Error", ILI9341_RED);
     return;
   }
 
+  // 画像フォーマットの変換
   small.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
   uint16_t* tmp = (uint16_t*)small.getImgBuff();
 
-  // RGBデータから輝度データを計算してDNNに入力
+  // DNNに入力する輝度データの計算
   float* dnnbuf = input.data();
   float f_max = 0.0;
   for (int n = 0; n < DNN_IMG_H * DNN_IMG_W; ++n) {
@@ -130,16 +134,45 @@ void CamCB(CamImage img) {
     if (dnnbuf[n] > f_max) f_max = dnnbuf[n];
   }
 
+  // 正規化処理
+  if (f_max == 0) {
+    Serial.println("Error: Max value is zero, normalization failed.");
+    putStringOnLcd("Normalization Error", ILI9341_RED);
+    return;
+  }
+  
   // 正規化
   for (int n = 0; n < DNN_IMG_W * DNN_IMG_H; ++n) {
     dnnbuf[n] /= f_max;
   }
+
+  Serial.println("Preprocessing successful.");
+  // 正常終了後、次の処理に進む
+}
+
+
+
+void CamCB(CamImage img) {
+  if (!img.isAvailable()) {
+    Serial.println("Image is not available. Try again");
+    return;
+  }
+
+  preprocessImage(img, input);
   
   String gStrResult = "?";
+  startMicros = millis();
   dnnrt.inputVariable(input, 0);
   dnnrt.forward();
   DNNVariable output = dnnrt.outputVariable(0);
+  endMicros = millis();
   
+  elapsedTime = endMicros - startMicros;
+
+  Serial.print("Loop time: ");
+  Serial.print(elapsedTime);
+  Serial.println(" ms");
+
   img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
   uint16_t* imgBuf = (uint16_t*)img.getImgBuff(); 
 
@@ -168,6 +201,8 @@ void CamCB(CamImage img) {
   // flag初期化
   ChangeModeFlag = false;
 }
+
+
 
 
 

@@ -1,15 +1,10 @@
 /*
 ✔ Ver.0.0.0 推論実行
- Ver.0.0.1 推論時間計測、表示
- Ver.0.1.0 大サイズ、2箇所推論
- Ver.0.2.0 中サイズ推論
- Ver.0.2.1 中サイズ2か所推論
- Ver.0.2.2 中サイズ2x3箇所推論
- Ver.0.3.0 小サイズ1箇所推論
- Ver.0.3.1 小サイズ2か所推論
- Ver.0.3.2 小サイズ3x4箇所異論
- Ver.0.4.0 大サイズ2か所、中サイズ2か所推論
- Ver.0.4.1 全箇所推論
+✔ Ver.0.0.1 推論時間計測、表示
+✔ Ver.0.0.2 preprocessを関数化、大サイズ、小サイズ推論
+ Ver.0.1.0 複数エリアをループで推論
+ Ver.0.1.1 スコア比較して表示
+ Ver.0.2.0 全箇所推論
 */
 
 char version[] = "DNN_dev_25classes Ver.0.0.0";
@@ -39,7 +34,7 @@ SDClass theSD;
 #define DNN_IMG_H 28
 #define CAM_IMG_W 320
 #define CAM_IMG_H 240
-#define CAM_CLIP_X 0//104
+#define CAM_CLIP_X 96//96
 #define CAM_CLIP_Y 0//64
 #define CAM_CLIP_W 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
 #define CAM_CLIP_H 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
@@ -54,6 +49,11 @@ uint8_t buf[DNN_IMG_W*DNN_IMG_H];
 
 DNNRT dnnrt;
 DNNVariable input(DNN_IMG_W*DNN_IMG_H);
+
+//推論時間計測用
+unsigned long startMicros; // 処理開始時間を記録する変数
+unsigned long endMicros;   // 処理終了時間を記録する変数
+unsigned long elapsedTime;    // 処理時間を記録する変数
   
 //static uint8_t const label[2]= {0,1};
 static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_R3", 
@@ -63,6 +63,41 @@ static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_
                                 "Right_R0",   "Right_R1",   "Right_R2",   "Right_R3",
                                 "Top_R0",     "Top_R1",     "Top_R2",     "Top_R3",
                                 "empty"};
+
+//画像クロップ領域指定
+struct ClipRect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
+struct ClipRectSet {
+    ClipRect clips[17];  // 5つのクロップ領域を格納する配列
+};
+
+ClipRectSet clipSet = {
+    {
+        {  0,   0, 224, 224}, //  0:large 1
+        { 96,   0, 224, 224}, //  1:large 2
+        {  0,   0, 112, 112}, //  2:small 1
+        {  0,  56, 112, 112}, //  3:small 2
+        {  0, 112, 112, 112}, //  4:small 3
+        { 56,   0, 112, 112}, //  5:small 4
+        { 56,  56, 112, 112}, //  6:small 5
+        { 56, 112, 112, 112}, //  7:small 6
+        {112,   0, 112, 112}, //  8:small 7
+        {112,  56, 112, 112}, //  9:small 8
+        {112, 112, 112, 112}, // 10:small 9
+        {168,   0, 112, 112}, // 11:small 10
+        {168,  56, 112, 112}, // 12:small 11
+        {168, 112, 112, 112}, // 13:small 12
+        {208,   0, 112, 112}, // 14:small 13
+        {208,  56, 112, 112}, // 15:small 14
+        {208, 112, 112, 112}, // 16:small 15
+
+    }
+};
 
 void putStringOnLcd(String str, int color) {
   int len = str.length();
@@ -75,44 +110,42 @@ void putStringOnLcd(String str, int color) {
   tft.println(str);
 }
 
-void drawBox(uint16_t* imgBuf) {
+void drawBox(uint16_t* imgBuf, const ClipRect& clip) {
   /* Draw target line */
-  for (int x = CAM_CLIP_X; x < CAM_CLIP_X+CAM_CLIP_W; ++x) {
+  for (int x = clip.x; x < clip.x+clip.width; ++x) {
     for (int n = 0; n < LINE_THICKNESS; ++n) {
-      *(imgBuf + CAM_IMG_W*(CAM_CLIP_Y+n) + x)              = ILI9341_RED;
-      *(imgBuf + CAM_IMG_W*(CAM_CLIP_Y+CAM_CLIP_H-1-n) + x) = ILI9341_RED;
+      *(imgBuf + CAM_IMG_W*(clip.y+n) + x)              = ILI9341_RED;
+      *(imgBuf + CAM_IMG_W*(clip.y+clip.height-1-n) + x) = ILI9341_RED;
     }
   }
-  for (int y = CAM_CLIP_Y; y < CAM_CLIP_Y+CAM_CLIP_H; ++y) {
+  for (int y = clip.y; y < clip.y+clip.height; ++y) {
     for (int n = 0; n < LINE_THICKNESS; ++n) {
-      *(imgBuf + CAM_IMG_W*y + CAM_CLIP_X+n)                = ILI9341_RED;
-      *(imgBuf + CAM_IMG_W*y + CAM_CLIP_X + CAM_CLIP_W-1-n) = ILI9341_RED;
+      *(imgBuf + CAM_IMG_W*y + clip.x+n)                = ILI9341_RED;
+      *(imgBuf + CAM_IMG_W*y + clip.x + clip.width-1-n) = ILI9341_RED;
     }
   }  
 }
 
 
-void CamCB(CamImage img) {
-  if (!img.isAvailable()) {
-    Serial.println("Image is not available. Try again");
-    return;
-  }
-
+void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
+  // 画像をクロップしてリサイズ
   CamImage small;
   CamErr err = img.clipAndResizeImageByHW(small, 
-                                          CAM_CLIP_X, CAM_CLIP_Y, 
-                                          CAM_CLIP_X + CAM_CLIP_W - 1, 
-                                          CAM_CLIP_Y + CAM_CLIP_H - 1, 
-                                          DNN_IMG_W, DNN_IMG_H);
+                                           clip.x, clip.y, 
+                                           clip.x + clip.width - 1, 
+                                           clip.y + clip.height - 1, 
+                                           DNN_IMG_W, DNN_IMG_H);
   if (!small.isAvailable()) {
-    putStringOnLcd("Clip and Resize Error:" + String(err), ILI9341_RED);
+    Serial.println("Error: Clip and Resize failed.");
+    putStringOnLcd("Clip and Resize Error", ILI9341_RED);
     return;
   }
 
+  // 画像フォーマットの変換
   small.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
   uint16_t* tmp = (uint16_t*)small.getImgBuff();
 
-  // RGBデータから輝度データを計算してDNNに入力
+  // DNNに入力する輝度データの計算
   float* dnnbuf = input.data();
   float f_max = 0.0;
   for (int n = 0; n < DNN_IMG_H * DNN_IMG_W; ++n) {
@@ -130,25 +163,55 @@ void CamCB(CamImage img) {
     if (dnnbuf[n] > f_max) f_max = dnnbuf[n];
   }
 
+  // 正規化処理
+  if (f_max == 0) {
+    Serial.println("Error: Max value is zero, normalization failed.");
+    putStringOnLcd("Normalization Error", ILI9341_RED);
+    return;
+  }
+  
   // 正規化
   for (int n = 0; n < DNN_IMG_W * DNN_IMG_H; ++n) {
     dnnbuf[n] /= f_max;
   }
+
+  Serial.println("Preprocessing successful.");
+  // 正常終了後、次の処理に進む
+}
+
+
+
+void CamCB(CamImage img) {
+  if (!img.isAvailable()) {
+    Serial.println("Image is not available. Try again");
+    return;
+  }
+  int i = 16;
+  preprocessImage(img, input, clipSet.clips[i]);
   
   String gStrResult = "?";
+  startMicros = millis();
   dnnrt.inputVariable(input, 0);
   dnnrt.forward();
   DNNVariable output = dnnrt.outputVariable(0);
+  endMicros = millis();
   
+  elapsedTime = endMicros - startMicros;
+
+  Serial.print("Loop time: ");
+  Serial.print(elapsedTime);
+  Serial.println(" ms");
+
   img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
   uint16_t* imgBuf = (uint16_t*)img.getImgBuff(); 
 
   // Box描画
-  drawBox(imgBuf); 
+  drawBox(imgBuf, clipSet.clips[i]); 
   // TFT描画
   tft.drawRGBBitmap(0, 0, (uint16_t *)img.getImgBuff(), 320, 224);
   // text描画
   int index = output.maxIndex();
+
 
   if (output[index] >= threshold){
     gStrResult = String(label[index]) + String(":") + String(output[index]);
@@ -168,6 +231,8 @@ void CamCB(CamImage img) {
   // flag初期化
   ChangeModeFlag = false;
 }
+
+
 
 
 
