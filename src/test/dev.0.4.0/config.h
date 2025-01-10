@@ -20,7 +20,7 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-#define WORK //HOME, HOME3A. WORK, WORK3A or NOTE3A
+#define NOTE //HOME, HOME3A. WORK, WORK3A or NOTE3A
 
 #ifdef HOME
 #define  AP_SSID        "kumakero2.4"
@@ -40,11 +40,17 @@
 #define  HTTP_SRVR_IP   "192.168.1.65"
 #define  MQTT_SRVR      "192.168.1.65"
 
-#elif define(WORK3A)
+#elif defined(WORK3A)
 #define  AP_SSID        "airpocket"
 #define  PASSPHRASE     "openpass"
 #define  HTTP_SRVR_IP   "192.168.101.56"
 #define  MQTT_SRVR      "192.168.191.56"
+
+#elif defined(NOTE)
+#define  AP_SSID        "airpocket"
+#define  PASSPHRASE     "openpass"
+#define  HTTP_SRVR_IP   "192.168.137.1"
+#define  MQTT_SRVR      "192.168.137.1"
 
 #elif defined(NOTE3A)
 #define  AP_SSID        "airpocket"
