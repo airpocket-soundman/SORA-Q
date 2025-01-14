@@ -9,14 +9,14 @@
  ✔           MQTTによる車輪ロックON/OFF機能
  ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
  ✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
- Ver.0.4.0 roop内から定期的に画像送信
- Ver.0.4.1 物体検出結果を画像送信
+ ✔ Ver.0.4.0 roop内から定期的に画像送信
+  Ver.0.4.1 物体検出結果を画像送信
  
- Ver.0.6.0 ラジコン走行
- Ver.0.6.1 自動走行追加
+  Ver.0.6.0 ラジコン走行
+  Ver.0.6.1 自動走行追加
  */
 
-char version[] = "Ver.0.4.0";
+char version[] = "Ver.0.4.1";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -45,6 +45,7 @@ char version[] = "Ver.0.4.0";
 #define PHOTO_REFLECTOR_THRETHOLD_LEFT  100
 #define PHOTO_REFLECTOR_THRETHOLD_RIGHT 100
 
+// イメージ設定
 #define DNN_IMG_W 28
 #define DNN_IMG_H 28
 #define CAM_IMG_W 320
@@ -54,19 +55,12 @@ char version[] = "Ver.0.4.0";
 #define CAM_CLIP_W 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
 #define CAM_CLIP_H 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
 
-#define LINE_THICKNESS 5      /
+#define LINE_THICKNESS 5
+
+#define RGB565(r, g, b) (((r & 0x1F) << 11) | ((g & 0x3F) << 5) | (b & 0x1F))
 
 
-
-const uint16_t RECEIVE_PACKET_SIZE = 1500;
-uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
-bool nnb_copy = true;
-
-char nnbFile[] = "airpocket_newlogo.jpg";
-//char nnbFile[] = "slim.nnb";
-char flashPath[] = "data/slim.nnb";
-char flashFolder[] = "data/";
-
+float threshold = 0.2;
 
 DNNRT dnnrt;
 DNNVariable input(DNN_IMG_W*DNN_IMG_H);
@@ -76,37 +70,14 @@ unsigned long startMicros; // 処理開始時間を記録する変数
 unsigned long endMicros;   // 処理終了時間を記録する変数
 unsigned long elapsedTime;    // 処理時間を記録する変数
 
-
-
-
-
-// auto start on/off
-bool autoStart      = false;
-
-// test mode on/off
-bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
-bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
-bool analogReadTest = false;
-bool driveTest      = false;
-
-// out put mode on/off
-bool photo_reflector_out = true;
-
-bool photo_reflector_left   = false;
-bool photo_reflector_right  = false;
-
-String param1, param2, param3, param4, param5, param6;
-
-TelitWiFi gs2200;
-TWIFI_Params gsparams;
-HttpGs2200 theHttpGs2200(&gs2200);
-HTTPGS2200_HostParams httpHostParams; // HTTPサーバ接続用のホストパラメータ
-SDClass theSD;
-MqttGs2200 theMqttGs2200(&gs2200);
-MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
-bool served = false;
-MQTTGS2200_Mqtt mqtt;
-
+//static uint8_t const label[2]= {0,1};
+static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_R3", 
+                                "Bottom_R0",  "Bottom_R1",  "Bottom_R2",  "Bottom_R3", 
+                                "Front_R0",   "Front_R1",   "Front_R2",   "Front_R3",
+                                "Left_R0",    "Left_R1",    "Left_R2",    "Left_R3",
+                                "Right_R0",   "Right_R1",   "Right_R2",   "Right_R3",
+                                "Top_R0",     "Top_R1",     "Top_R2",     "Top_R3",
+                                "empty"};
 
 //画像クロップ領域指定
 struct ClipRect {
@@ -142,6 +113,43 @@ ClipRectSet clipSet = {
 
     }
 };
+
+const uint16_t RECEIVE_PACKET_SIZE = 1500;
+uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
+bool nnb_copy = true;
+
+char nnbFile[] = "airpocket_newlogo.jpg";
+char flashPath[] = "data/slim.nnb";
+char flashFolder[] = "data/";
+//char nnbFile[] = "slim.nnb";
+
+
+// auto start on/off
+bool autoStart      = false;
+
+// test mode on/off
+bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
+bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
+bool analogReadTest = false;
+bool driveTest      = false;
+
+// out put mode on/off
+bool photo_reflector_out = true;
+
+bool photo_reflector_left   = false;
+bool photo_reflector_right  = false;
+
+String param1, param2, param3, param4, param5, param6;
+
+TelitWiFi gs2200;
+TWIFI_Params gsparams;
+HttpGs2200 theHttpGs2200(&gs2200);
+HTTPGS2200_HostParams httpHostParams; // HTTPサーバ接続用のホストパラメータ
+SDClass theSD;
+MqttGs2200 theMqttGs2200(&gs2200);
+MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
+bool served = false;
+MQTTGS2200_Mqtt mqtt;
 
 
 
@@ -187,14 +195,14 @@ void read_photo_reflector(){
 void lockWheels(){
   Serial.println("lock wheels");
   motor_handler( -75,  -75);
-  delay(400);
+  delay(300);
   motor_handler(   0,    0);
 }
 
 void unlockWheels(){
   Serial.println("unlock wheels");
   motor_handler(  75,   75);
-  delay(400);
+  delay(300);
   motor_handler(   0,    0);
 }
 
@@ -434,6 +442,7 @@ bool custom_post(const char *url_path, const char *body, uint32_t size) {
 
 }
 
+
 void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
  
   Serial.print("imgBuffer is available: ");
@@ -480,7 +489,7 @@ void camImagePost(){
       }
     take_picture_count++;
     }
-    theCamera.end();
+    //theCamera.end();
     Serial.println("==== cam Image Post test is finished.\n");
   } else {
     Serial.println("==== cam Image Post test was passed.\n");
@@ -539,14 +548,48 @@ void uploadNNB() {
   }
 }
 
+void drawBox(uint16_t* imgBuf, const ClipRect& clip) {
+  /* Draw target line */
+  for (int x = clip.x; x < clip.x+clip.width; ++x) {
+    for (int n = 0; n < LINE_THICKNESS; ++n) {
+      *(imgBuf + CAM_IMG_W*(clip.y+n) + x)               = RGB565(31, 0, 0);
+      *(imgBuf + CAM_IMG_W*(clip.y+clip.height-1-n) + x) = RGB565(31, 0, 0);
+    }
+  }
+  for (int y = clip.y; y < clip.y+clip.height; ++y) {
+    for (int n = 0; n < LINE_THICKNESS; ++n) {
+      *(imgBuf + CAM_IMG_W*y + clip.x+n)                = RGB565(31, 0, 0);
+      *(imgBuf + CAM_IMG_W*y + clip.x + clip.width-1-n) = RGB565(31, 0, 0);
+    }
+  }  
+}
+
 void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   // 画像をクロップしてリサイズ
+
+Serial.print("Clip Rect: ");
+Serial.print("x: "); Serial.print(CAM_CLIP_X);
+Serial.print(", y: "); Serial.print(CAM_CLIP_Y);
+Serial.print(", width: "); Serial.print(CAM_CLIP_W);
+Serial.print(", height: "); Serial.println(CAM_CLIP_H);
+
+if (CAM_CLIP_X + CAM_CLIP_W > CAM_IMG_W || CAM_CLIP_Y + CAM_CLIP_H > CAM_IMG_H) {
+    Serial.println("Error: Clip region exceeds image boundaries.");
+}
+
+
+
+
   CamImage small;
   CamErr err = img.clipAndResizeImageByHW(small, 
                                            clip.x, clip.y, 
                                            clip.x + clip.width - 1, 
                                            clip.y + clip.height - 1, 
                                            DNN_IMG_W, DNN_IMG_H);
+
+  Serial.print("Clip and Resize failed with error code: ");
+  Serial.println(err);
+
   if (!small.isAvailable()) {
     Serial.println("Error: Clip and Resize failed.");
     return;
@@ -589,18 +632,107 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   // 正常終了後、次の処理に進む
 }
 
+
+
 //推論開始
 void inferrence(){
-  Serial.println("==== start inferenceｓ");
+ 
+  //画像取得
+  theCamera.begin();
   CamImage img = theCamera.takePicture();
+  Serial.println("==== start inferences");
+
+  //変数初期化
+
+  String gStrResult = "?";
+  String maxLabel   = "?";
+  int targetArea    = 0;
+  int maxIndex      = 0;
+  float maxOutput   = 0.0;
+  if (!img.isAvailable()) {
+    Serial.println("Image is not available. Try again");
+    return;
+  }
+
+  Serial.println("prepre");
+  preprocessImage(img, input, clipSet.clips[0]);
+  
+  for (int i = 0; i < 17; i++) {
+    Serial.print("roop:");
+    Serial.println(i);
+
+    preprocessImage(img, input, clipSet.clips[i]);
+
+    
+    startMicros = millis();
+    dnnrt.inputVariable(input, 0);
+    dnnrt.forward();
+    DNNVariable output = dnnrt.outputVariable(0);
+    endMicros = millis();
+    elapsedTime = endMicros - startMicros;
+
+    Serial.print("Loop time: ");
+    Serial.print(elapsedTime);
+    Serial.println(" ms");
+
+    // text描画
+    int index = output.maxIndex();
+    Serial.print("index:");
+    Serial.println(index);
+
+    if (i == 0){
+      targetArea = 0;
+      maxIndex   = index;
+      maxOutput  = output[index];
+      maxLabel   = String(label[index]);
+    } 
+    else{
+      if (maxIndex == 24){
+        if (index != 24){
+          targetArea = i;
+          maxIndex   = index;
+          maxOutput  = output[index];
+          maxLabel   = String(label[index]);
+        }
+      }
+      else {
+        if (output[index] > maxOutput){
+          targetArea = i;
+          maxIndex   = index;
+          maxOutput  = output[index];
+          maxLabel   = String(label[index]);
+        }
+      }
+    }
+    if (output[index] >= threshold) {
+      gStrResult = String(label[index]) + String(":") + String(output[index]);
+    } else {
+      gStrResult = "not identify";
+    }
+    Serial.println(gStrResult);
+
+  }
+
+  Serial.println("total score======");
+  Serial.print("targetArea:");
+  Serial.println(targetArea);
+  Serial.print("maxIndex:");
+  Serial.println(maxIndex);
+  Serial.println(String(maxLabel) + String(":") + String(maxOutput));
+  Serial.println("=======================");
+
+
+
   if (img.isAvailable()) {
     uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
+    //drawBox(imgBuffer, clipSet.clips[targetArea]);
+
     size_t imageSize = img.getImgSize();
     uploadImage(imgBuffer, imageSize);
   } else {
     Serial.println("Failed to take picture");
   }
-  theCamera.end();
+  //
   Serial.println("==== cam Image Post test is finished.\n");
 }
 
@@ -612,13 +744,14 @@ void GS2200wifiSetup(){
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
 
   /* Initialize SPI access of GS2200 */
+  //Init_GS2200_SPI_type(iS110B_TypeA);
+
   #if defined(iS110_TYPEA)
     Init_GS2200_SPI_type(iS110B_TypeA);
   #elif defined(iS110_TYPEB)
     Init_GS2200_SPI_type(iS110B_TypeB);
   #elif defined(iS110_TYPEC)
     Init_GS2200_SPI_type(iS110B_TypeC);
-    Serial.print("type_c");
   #else
     #error "No valid device type defined. Please define iS110_TYPEA, iS110_TYPEB, or iS110_TYPEC."
   #endif
@@ -745,11 +878,13 @@ void setup() {
   err = theCamera.setStillPictureImageFormat(
     //CAM_IMGSIZE_QUADVGA_H,      //1280
     //CAM_IMGSIZE_QUADVGA_V,      //960
-    CAM_IMGSIZE_VGA_H,          //640
-    CAM_IMGSIZE_VGA_V,          //480
-    //CAM_IMGSIZE_QVGA_H,         //320
-    //CAM_IMGSIZE_QVGA_V,         //240
-    CAM_IMAGE_PIX_FMT_JPG);
+    //CAM_IMGSIZE_VGA_H,          //640
+    //CAM_IMGSIZE_VGA_V,          //480
+    CAM_IMGSIZE_QVGA_H,         //320
+    CAM_IMGSIZE_QVGA_V,         //240
+    //CAM_IMAGE_PIX_FMT_JPG
+    CAM_IMAGE_PIX_FMT_RGB565
+    );
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
@@ -778,4 +913,7 @@ void loop() {
   checkMQTTtopic();
   //read_photo_reflector();
   inferrence();
+
+
+				
 }
