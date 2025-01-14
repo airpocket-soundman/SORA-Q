@@ -44,7 +44,7 @@
 #define  HTTP_SRVR_IP   "192.168.1.65"
 #define  MQTT_SRVR      "192.168.1.65"
 
-#elif define(WORK3A)
+#elif defined(WORK3A)
 #define  AP_SSID        "airpocket"
 #define  PASSPHRASE     "openpass"
 #define  HTTP_SRVR_IP   "192.168.101.56"
