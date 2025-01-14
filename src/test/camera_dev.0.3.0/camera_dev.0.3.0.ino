@@ -78,9 +78,30 @@ void printError(enum CamErr err)
   }
 }
 
+void printPixFormatAsString(int pixFormat) {
+    char format[5]; // 4文字 + 終端文字('\0')
+    format[0] = pixFormat & 0xFF;        // 最下位バイト
+    format[1] = (pixFormat >> 8) & 0xFF;
+    format[2] = (pixFormat >> 16) & 0xFF;
+    format[3] = (pixFormat >> 24) & 0xFF; // 最上位バイト
+    format[4] = '\0';                     // 終端文字
+
+    Serial.print("pix format: ");
+    Serial.println(format);
+}
+
 void CamCB(CamImage img){
+  
   if (img.isAvailable()) {
+    Serial.print("check pix format");
+    int pixFormat = img.getPixFormat();
+    printPixFormatAsString(pixFormat);
+    img.convertPixFormat(CAM_IMAGE_PIX_FMT_JPG);
+    pixFormat = img.getPixFormat();
+    printPixFormatAsString(pixFormat);
     img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
+    pixFormat = img.getPixFormat();
+    printPixFormatAsString(pixFormat);
     tft.drawRGBBitmap(0, 0, (uint16_t *)img.getImgBuff(), 320, 240);
     Serial.print("Image data size = ");
     Serial.print(img.getImgSize(), DEC);
@@ -127,9 +148,9 @@ void setup() {
   }
 
   theCamera.setStillPictureImageFormat(
-    CAM_IMGSIZE_QVGA_H ,CAM_IMGSIZE_QVGA_V
-    //CAM_IMGSIZE_QVGA_H ,CAM_IMGSIZE_QVGA_H
-   ,CAM_IMAGE_PIX_FMT_JPG);
+    CAM_IMGSIZE_QVGA_H,
+    CAM_IMGSIZE_QVGA_V,
+    CAM_IMAGE_PIX_FMT_JPG);
 
   attachInterrupt(digitalPinToInterrupt(intPin) ,changeState ,FALLING);
 }

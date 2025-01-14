@@ -632,14 +632,39 @@ if (CAM_CLIP_X + CAM_CLIP_W > CAM_IMG_W || CAM_CLIP_Y + CAM_CLIP_H > CAM_IMG_H) 
   // 正常終了後、次の処理に進む
 }
 
+void printPixFormatAsString(int pixFormat) {
+    char format[5]; // 4文字 + 終端文字('\0')
+    format[0] = pixFormat & 0xFF;        // 最下位バイト
+    format[1] = (pixFormat >> 8) & 0xFF;
+    format[2] = (pixFormat >> 16) & 0xFF;
+    format[3] = (pixFormat >> 24) & 0xFF; // 最上位バイト
+    format[4] = '\0';                     // 終端文字
 
+    Serial.print("pix format: ");
+    Serial.println(format);
+}
 
 //推論開始
 void inferrence(){
  
   //画像取得
+  
   theCamera.begin();
+  Serial.println("==== get picture");
   CamImage img = theCamera.takePicture();
+  int pixFormat = img.getPixFormat();
+  printPixFormatAsString(pixFormat);
+
+  if (img.isAvailable()) {
+    uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
+    //drawBox(imgBuffer, clipSet.clips[targetArea]);
+
+    size_t imageSize = img.getImgSize();
+    uploadImage(imgBuffer, imageSize);
+  } else {
+    Serial.println("Failed to take picture");
+  }
+
   Serial.println("==== start inferences");
 
   //変数初期化
@@ -655,8 +680,14 @@ void inferrence(){
   }
 
   Serial.println("prepre");
+  Serial.println("convert Pix Format");
+  //img.convertPixFormat(CAM_IMAGE_PIX_FMT_YUV422);
+  pixFormat = img.getPixFormat();
+  printPixFormatAsString(pixFormat);
+
+
   preprocessImage(img, input, clipSet.clips[0]);
-  
+  /*
   for (int i = 0; i < 17; i++) {
     Serial.print("roop:");
     Serial.println(i);
@@ -712,7 +743,7 @@ void inferrence(){
     Serial.println(gStrResult);
 
   }
-
+ 
   Serial.println("total score======");
   Serial.print("targetArea:");
   Serial.println(targetArea);
@@ -721,7 +752,7 @@ void inferrence(){
   Serial.println(String(maxLabel) + String(":") + String(maxOutput));
   Serial.println("=======================");
 
-
+  */
 
   if (img.isAvailable()) {
     uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
@@ -860,11 +891,9 @@ void setup() {
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
-
+  Serial.println("Streaming stopped for capture");
   /* Auto white balance configuration */
 
-  Serial.println("Set Auto white balance parameter");
-  err = theCamera.setAutoWhiteBalanceMode(CAM_WHITE_BALANCE_DAYLIGHT);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
@@ -883,6 +912,7 @@ void setup() {
     CAM_IMGSIZE_QVGA_H,         //320
     CAM_IMGSIZE_QVGA_V,         //240
     //CAM_IMAGE_PIX_FMT_JPG
+    //CAM_IMAGE_PIX_FMT_YUV422
     CAM_IMAGE_PIX_FMT_RGB565
     );
   if (err != CAM_ERR_SUCCESS) {
@@ -914,6 +944,6 @@ void loop() {
   //read_photo_reflector();
   inferrence();
 
-
+  Serial.println("Streaming restarted");
 				
 }
