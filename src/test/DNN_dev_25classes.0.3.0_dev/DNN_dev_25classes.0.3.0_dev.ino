@@ -8,7 +8,7 @@
  Ver.0.3.0 roop処理化
 */
 
-char version[] = "DNN_dev_25classes Ver.0.1.1";
+char version[] = "DNN_dev_25classes Ver.0.3.0 dev";
 
 #include <Camera.h>
 #include <SPI.h>
@@ -100,6 +100,44 @@ ClipRectSet clipSet = {
     }
 };
 
+
+void printError(enum CamErr err) {
+  Serial.print("Error: ");
+  switch (err) {
+    case CAM_ERR_NO_DEVICE:
+      Serial.println("No Device");
+      break;
+    case CAM_ERR_ILLEGAL_DEVERR:
+      Serial.println("Illegal device error");
+      break;
+    case CAM_ERR_ALREADY_INITIALIZED:
+      Serial.println("Already initialized");
+      break;
+    case CAM_ERR_NOT_INITIALIZED:
+      Serial.println("Not initialized");
+      break;
+    case CAM_ERR_NOT_STILL_INITIALIZED:
+      Serial.println("Still picture not initialized");
+      break;
+    case CAM_ERR_CANT_CREATE_THREAD:
+      Serial.println("Failed to create thread");
+      break;
+    case CAM_ERR_INVALID_PARAM:
+      Serial.println("Invalid parameter");
+      break;
+    case CAM_ERR_NO_MEMORY:
+      Serial.println("No memory");
+      break;
+    case CAM_ERR_USR_INUSED:
+      Serial.println("Buffer already in use");
+      break;
+    case CAM_ERR_NOT_PERMITTED:
+      Serial.println("Operation not permitted");
+      break;
+    default:
+      break;
+  }
+}
 void putStringOnLcd(String str, int color) {
   int len = str.length();
   tft.fillRect(0,224, 320, 240, ILI9341_BLACK);
@@ -205,6 +243,7 @@ void CamCB(CamImage img) {
   }
 
   int pixFormat = img.getPixFormat();
+  Serial.println("++++++++++++++++++++++++++++++");
   printPixFormatAsString(pixFormat);
 
   
@@ -317,10 +356,25 @@ void setup() {
     return;
   }
 
-    
+  CamErr err;
   //start Camera
   Serial.println("camera.begin");
-  theCamera.begin();
+  err = theCamera.begin();
+  
+  err = theCamera.setStillPictureImageFormat(
+  //CAM_IMGSIZE_QUADVGA_H,      //1280
+  //CAM_IMGSIZE_QUADVGA_V,      //960
+  //CAM_IMGSIZE_VGA_H,          //640
+  //CAM_IMGSIZE_VGA_V,          //480
+  CAM_IMGSIZE_QVGA_H,         //320
+  CAM_IMGSIZE_QVGA_V,         //240
+  CAM_IMAGE_PIX_FMT_JPG
+  //CAM_IMAGE_PIX_FMT_YUV422
+  //CAM_IMAGE_PIX_FMT_RGB565 
+  );
+  if (err != CAM_ERR_SUCCESS) {
+    printError(err);
+  }
   
   Serial.println("camera.streaming");
   
@@ -328,5 +382,10 @@ void setup() {
 }
 
 void loop() { 
+
+  //Serial.println("==== get picture");
+  //CamImage img = theCamera.takePicture();
+  //int pixFormat = img.getPixFormat();
+  //printPixFormatAsString(pixFormat);
 
 }

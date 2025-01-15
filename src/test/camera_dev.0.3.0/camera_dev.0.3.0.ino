@@ -96,12 +96,15 @@ void CamCB(CamImage img){
     Serial.print("check pix format");
     int pixFormat = img.getPixFormat();
     printPixFormatAsString(pixFormat);
+    /*
     img.convertPixFormat(CAM_IMAGE_PIX_FMT_JPG);
     pixFormat = img.getPixFormat();
     printPixFormatAsString(pixFormat);
     img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
     pixFormat = img.getPixFormat();
     printPixFormatAsString(pixFormat);
+    */
+    
     tft.drawRGBBitmap(0, 0, (uint16_t *)img.getImgBuff(), 320, 240);
     Serial.print("Image data size = ");
     Serial.print(img.getImgSize(), DEC);
@@ -166,6 +169,8 @@ void loop() {
   Serial.println("Streaming stopped for capture");
 
   CamImage img = theCamera.takePicture();
+  int pixFormat = img.getPixFormat();
+  printPixFormatAsString(pixFormat);
 
   if (img.isAvailable()) {
     char filename[16] = {0};

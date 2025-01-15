@@ -10,7 +10,8 @@
  ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
  ✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
  ✔ Ver.0.4.0 roop内から定期的に画像送信
-  Ver.0.4.1 CamCBの中でinferrenceする
+  Ver.0.4.1 CamCBの中でinferrenceする　メモリ足りない
+  Ver.0.4.2 機能制限してメモリ確保
  
   Ver.0.6.0 ラジコン走行
   Ver.0.6.1 自動走行追加
@@ -23,7 +24,6 @@ char version[] = "Ver.0.4.1";
 #include <MqttGs2200.h>
 #include <SDHCI.h>
 #include <TelitWiFi.h>
-#include <stdio.h> /* for sprintf */
 #include <Camera.h>
 #include "config.h"
 #include <Flash.h>
@@ -36,8 +36,6 @@ char version[] = "Ver.0.4.1";
 #define SUBSCRIBE_TIMEOUT   60000	//ms
 #define START_TIMER         10000 //ms
 
-#define AIN1        A2       //左車輪エンコーダ
-#define AIN2        A3       //右車輪エンコーダ
 #define IN1_LEFT    19       //左車輪出力
 #define IN1_RIGHT   21       //右車輪出力
 #define IN2_LEFT    18       //左車輪方向
@@ -182,16 +180,6 @@ void motor_handler(int left_speed, int right_speed){
   }
 }
 
-void read_photo_reflector(){
-  photo_reflector_left  = (analogRead(A2) >= PHOTO_REFLECTOR_THRETHOLD_LEFT);
-  photo_reflector_right = (analogRead(A3) >= PHOTO_REFLECTOR_THRETHOLD_RIGHT);
-  //Serial.println("read photo reflector");
-  if (photo_reflector_out){
-    char buffer[50];
-    sprintf(buffer, "photo reflector value  LEFT = %d / RIGHT = %d", photo_reflector_left, photo_reflector_right);
-    Serial.println(buffer);
-  }
-}
 
 void lockWheels(){
   Serial.println("lock wheels");
@@ -206,60 +194,6 @@ void unlockWheels(){
   delay(300);
   motor_handler(   0,    0);
 }
-
-
-void checkDrive(){
-
-  if (driveTest){
-    Serial.println("==== drive test start");
-    int counter = 10;
-    while(counter > 0){
-      Serial.print("counter = ");
-      Serial.println(counter);
-      Serial.println("PWM:255  ENB:HIGH");
-      motor_handler( 100,  100);
-      for(int i = 0; i < 100; i++){
-        delay(100);
-        read_photo_reflector();
-      }
-      Serial.println("PWM:128  ENB:HIGH");
-      motor_handler(  75,   75);
-      for(int i = 0; i < 100; i++){
-        delay(100);
-        read_photo_reflector();
-      }
-      Serial.println("PWM: 64  ENB:HIGH");
-      motor_handler(  0,   0);
-      for(int i = 0; i < 100; i++){
-        delay(100);
-        read_photo_reflector();
-      }
-      Serial.println("PWM:255  ENB:LOW");
-      motor_handler(-100, -100);
-      for(int i = 0; i < 100; i++){
-        delay(100);
-        read_photo_reflector();
-      }
-      Serial.println("PWM:128  ENB:LOW");
-      motor_handler( -75,  -75);
-      for(int i = 0; i < 100; i++){
-        delay(100);
-        read_photo_reflector();
-      }
-      Serial.println("PWM: 64  ENB:LOW");
-      motor_handler( -0,  -0);
-      for(int i = 0; i < 100; i++){
-        delay(100);
-        read_photo_reflector();
-      }
-      counter--;
-    }
-    Serial.println("==== drive test is finished.\n");
-  } else {
-    Serial.println("==== drive test was skipped.\n");
-  }
-}
-
 
 void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
     int startIndex = 0;
@@ -338,51 +272,6 @@ void checkAnalogRead(){
   } else {
     Serial.println("==== analog read test was skipped.\n");
   }
-}
-
-void move_nnbFile(){
-
-  Serial.println("\n////////////////// nnb file /////////////////");
-  if (nnb_copy){
-    File readFile = theSD.open(nnbFile, FILE_READ);//flashPath
-    uint32_t file_size = readFile.size();
-    Serial.print("SD data file size = ");
-    Serial.println(file_size);
-    char *body = (char *)malloc(file_size);  // +1 is null char
-    if (body == NULL) {
-      Serial.println("No free memory");
-    }
-    int index = 0;
-    while (readFile.available()) {
-      body[index++] = readFile.read();
-    }
-    readFile.close();
-    //Flash.format();
-    Flash.mkdir(flashFolder);
-
-    if (Flash.exists(flashPath)) {
-      Flash.remove(flashPath);  // ファイルを削除
-    }
-    
-    File writeFile = Flash.open(flashPath, FILE_WRITE);
-    if (writeFile) {
-      Serial.println("nnb fileをフラッシュメモリ に書き込み中...");
-
-      // body のデータをフラッシュメモリに書き込む
-      writeFile.write((uint8_t*)body, file_size);
-
-      writeFile.close(); // ファイルを閉じる
-      Serial.println("nnb fileをフラッシュメモリへ書き込み完了");
-    } else {
-      // ファイルのオープンに失敗した場合
-      Serial.println("フラッシュメモリのファイルオープンに失敗しました");
-    }
-    free(body);
-  } else {
-    Serial.println("move nnb file passed.\n");
-  }
-  Serial.println("\n////////////////// nnb file end \\\\\\\\\\\\\\\\\\");
-
 }
 
 void parse_httpresponse(char *message) {
@@ -682,122 +571,6 @@ void printPixInfomation(CamImage& img) {
     Serial.println("====================");
 }
 
-/*
-//推論開始
-void inferrence(){
- 
-  //画像取得
-  
-  theCamera.begin();
-  Serial.println("==== get picture");
-  CamImage img = theCamera.takePicture();
-  Serial.println("======image info =========== @ <<inferrnece>>");
-  printPixInfomation(img);
-
-  if (img.isAvailable()) {
-    uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
-    //drawBox(imgBuffer, clipSet.clips[targetArea]);
-
-    size_t imageSize = img.getImgSize();
-  } else {
-    Serial.println("Failed to take picture");
-  }
-
-  Serial.println("==== start inferrences");
-
-  //変数初期化
-
-  String gStrResult = "?";
-  String maxLabel   = "?";
-  int targetArea    = 0;
-  int maxIndex      = 0;
-  float maxOutput   = 0.0;
-  if (!img.isAvailable()) {
-    Serial.println("Image is not available. Try again");
-    return;
-  }
-
-  Serial.println("convert Pix Format");
-  CamErr err = img.convertPixFormat(CAM_IMAGE_PIX_FMT_YUV422);
-  //CamErr err = img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
-  
-  if (err != CAM_ERR_SUCCESS) {
-    printError(err);
-  }
-  Serial.println("======image info =========== @ <<inferrence>> affter convert to YUV422");
-  printPixInfomation(img);
-
-
-  //preprocessImage(img, input, clipSet.clips[0]);
-  
-  for (int i = 0; i < 17; i++) {
-    Serial.print("roop:");
-    Serial.println(i);
-
-    preprocessImage(img, input, clipSet.clips[i]);
-
-    
-    startMicros = millis();
-    dnnrt.inputVariable(input, 0);
-    dnnrt.forward();
-    DNNVariable output = dnnrt.outputVariable(0);
-    endMicros = millis();
-    elapsedTime = endMicros - startMicros;
-
-    Serial.print("Loop time: ");
-    Serial.print(elapsedTime);
-    Serial.println(" ms");
-
-    // text描画
-    int index = output.maxIndex();
-    Serial.print("index:");
-    Serial.println(index);
-
-    if (i == 0){
-      targetArea = 0;
-      maxIndex   = index;
-      maxOutput  = output[index];
-      maxLabel   = String(label[index]);
-    } 
-    else{
-      if (maxIndex == 24){
-        if (index != 24){
-          targetArea = i;
-          maxIndex   = index;
-          maxOutput  = output[index];
-          maxLabel   = String(label[index]);
-        }
-      }
-      else {
-        if (output[index] > maxOutput){
-          targetArea = i;
-          maxIndex   = index;
-          maxOutput  = output[index];
-          maxLabel   = String(label[index]);
-        }
-      }
-    }
-    if (output[index] >= threshold) {
-      gStrResult = String(label[index]) + String(":") + String(output[index]);
-    } else {
-      gStrResult = "not identify";
-    }
-    Serial.println(gStrResult);
-
-  }
- 
-  Serial.println("total score======");
-  Serial.print("targetArea:");
-  Serial.println(targetArea);
-  Serial.print("maxIndex:");
-  Serial.println(maxIndex);
-  Serial.println(String(maxLabel) + String(":") + String(maxOutput));
-  Serial.println("=======================");
-}
-*/
-
-
-
 /* wifi Setup */
 void GS2200wifiSetup(){
   /* initialize digital pin LED_BUILTIN as an output. */
@@ -899,9 +672,9 @@ void CamCB(CamImage img){
     int size = dnnrt.outputSize(0);
     Serial.println(size);
 
-    DNNVariable output = dnnrt.outputVariable(0);
-  
-
+    //DNNVariable output = dnnrt.outputVariable(0);
+  }
+/*
 
     endMicros = millis();
     elapsedTime = endMicros - startMicros;
@@ -947,7 +720,7 @@ void CamCB(CamImage img){
     }
     Serial.println(gStrResult);
   }
-  
+  */
 
   Serial.println("total score======");
   Serial.print("targetArea:");
@@ -1054,11 +827,8 @@ void setup() {
 
   digitalWrite(LED0, HIGH);  // turn on LED
 
-  //move_nnbFile();
   //uploadNNB();
   camImagePost();
-  checkAnalogRead();
-  checkDrive();
 
   if (autoStart){
     delay(START_TIMER);
@@ -1066,11 +836,6 @@ void setup() {
     Serial.println("Begin Automatic Serch");
   }
 
-  //Serial.println(">stop streaming<");
-  //err = theCamera.startStreaming(false, CamCB);
-  //if (err != CAM_ERR_SUCCESS) {
-  //  printError(err);
-  //}
 }
 
 void loop() {
@@ -1082,6 +847,5 @@ void loop() {
   checkMQTTtopic();
 
   //camImagePost();
-  //read_photo_reflector();
 			
 }
