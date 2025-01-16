@@ -13,6 +13,7 @@
 ✔ Ver.0.4.1 CamCBの中でinferrenceする
 ✔ Ver.0.4.2 inferrenceの有無をスイッチングする
  Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする
+ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
  Ver.0.6.0 ラジコン走行
  Ver.0.6.1 自動走行追加
  */

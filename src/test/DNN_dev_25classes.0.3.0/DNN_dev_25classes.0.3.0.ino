@@ -186,7 +186,7 @@ void CamCB(CamImage img) {
   String gStrResult = "?";
   String maxLabel   = "?";
   int targetArea    = 0;
-  int maxIndex      = 0;
+  int maxIndex      = 24;
   float maxOutput   = 0.0;
   if (!img.isAvailable()) {
     Serial.println("Image is not available. Try again");
@@ -215,6 +215,12 @@ void CamCB(CamImage img) {
     int index = output.maxIndex();
     Serial.print("index:");
     Serial.println(index);
+
+    for(int j = 0;j < 25; j++){
+      Serial.print(j);
+      Serial.print(":");
+      Serial.println(output[j]);
+    }
 
     if (i == 0){
       targetArea = 0;
@@ -268,7 +274,9 @@ void CamCB(CamImage img) {
   uint16_t* imgBuf = (uint16_t*)img.getImgBuff(); 
 
   // Box描画
-  drawBox(imgBuf, clipSet.clips[targetArea]);
+  if (maxIndex != 24){
+    drawBox(imgBuf, clipSet.clips[targetArea]);
+  }
   // TFT描画
   tft.drawRGBBitmap(0, 0, imgBuf, 320, 224);
 
