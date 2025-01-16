@@ -12,7 +12,7 @@
 ✔ Ver.0.4.0 roop内から定期的に画像送信
 ✔ Ver.0.4.1 CamCBの中でinferrenceする
 ✔ Ver.0.4.2 inferrenceの有無をスイッチングする
- Ver.0.4.3 inferrenceの結果と画像を送信する
+ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする
  Ver.0.6.0 ラジコン走行
  Ver.0.6.1 自動走行追加
  */
