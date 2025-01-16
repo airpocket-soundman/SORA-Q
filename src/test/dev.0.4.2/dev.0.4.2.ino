@@ -1,20 +1,19 @@
 /* SORA-Q projeckt                                  
- ✔ ver.0.1.0 SDがある場合はFlashにファイルをコピーする
- ✔ ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
- ✔ ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
- ✔ Ver.0.2.0 MQTT受信追加
- ✔ Ver.0.3.0 motor_handler追加
- ✔ Ver.0.3.1 モータードライバmode 0化
- ✔ Ver.0.3.2 開閉ロック制御関数追加
- ✔           MQTTによる車輪ロックON/OFF機能
- ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
- ✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
- ✔ Ver.0.4.0 roop内から定期的に画像送信
-  Ver.0.4.1 CamCBの中でinferrenceする　メモリ足りない
-  Ver.0.4.2 機能制限してメモリ確保
- 
-  Ver.0.6.0 ラジコン走行
-  Ver.0.6.1 自動走行追加
+✔ ver.0.1.0 SDがある場合はFlashにファイルをコピーする
+✔ ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
+✔ ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
+✔ Ver.0.2.0 MQTT受信追加
+✔ Ver.0.3.0 motor_handler追加
+✔ Ver.0.3.1 モータードライバmode 0化
+✔ Ver.0.3.2 開閉ロック制御関数追加
+✔           MQTTによる車輪ロックON/OFF機能
+✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
+✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
+✔ Ver.0.4.0 roop内から定期的に画像送信
+✔ Ver.0.4.1 CamCBの中でinferrenceする
+ Ver.0.4.2 inferrenceの有無をスイッチングする
+ Ver.0.6.0 ラジコン走行
+ Ver.0.6.1 自動走行追加
  */
 
 char version[] = "Ver.0.4.1";
@@ -24,6 +23,7 @@ char version[] = "Ver.0.4.1";
 #include <MqttGs2200.h>
 #include <SDHCI.h>
 #include <TelitWiFi.h>
+#include <stdio.h> /* for sprintf */
 #include <Camera.h>
 #include "config.h"
 #include <Flash.h>
@@ -36,6 +36,8 @@ char version[] = "Ver.0.4.1";
 #define SUBSCRIBE_TIMEOUT   60000	//ms
 #define START_TIMER         10000 //ms
 
+#define AIN1        A2       //左車輪エンコーダ
+#define AIN2        A3       //右車輪エンコーダ
 #define IN1_LEFT    19       //左車輪出力
 #define IN1_RIGHT   21       //右車輪出力
 #define IN2_LEFT    18       //左車輪方向
@@ -62,7 +64,7 @@ float threshold = 0.2;
 
 DNNRT dnnrt;
 DNNVariable input(DNN_IMG_W*DNN_IMG_H);
-//DNNVariable output();
+CamErr err;
 
 //推論時間計測用
 unsigned long startMicros; // 処理開始時間を記録する変数
@@ -121,6 +123,8 @@ bool nnb_copy = true;
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 char nnbFile[] = "model.nnb";
+bool doInferrence   = false;
+
 
 
 // auto start on/off
@@ -133,8 +137,7 @@ bool analogReadTest = false;
 bool driveTest      = false;
 
 // out put mode on/off
-bool photo_reflector_out = true;
-
+bool photo_reflector_out    = false;
 bool photo_reflector_left   = false;
 bool photo_reflector_right  = false;
 
@@ -180,6 +183,16 @@ void motor_handler(int left_speed, int right_speed){
   }
 }
 
+void read_photo_reflector(){
+  photo_reflector_left  = (analogRead(A2) >= PHOTO_REFLECTOR_THRETHOLD_LEFT);
+  photo_reflector_right = (analogRead(A3) >= PHOTO_REFLECTOR_THRETHOLD_RIGHT);
+  //Serial.println("read photo reflector");
+  if (photo_reflector_out){
+    char buffer[50];
+    sprintf(buffer, "photo reflector value  LEFT = %d / RIGHT = %d", photo_reflector_left, photo_reflector_right);
+    Serial.println(buffer);
+  }
+}
 
 void lockWheels(){
   Serial.println("lock wheels");
@@ -194,6 +207,60 @@ void unlockWheels(){
   delay(300);
   motor_handler(   0,    0);
 }
+
+
+void checkDrive(){
+
+  if (driveTest){
+    Serial.println("==== drive test start");
+    int counter = 10;
+    while(counter > 0){
+      Serial.print("counter = ");
+      Serial.println(counter);
+      Serial.println("PWM:255  ENB:HIGH");
+      motor_handler( 100,  100);
+      for(int i = 0; i < 100; i++){
+        delay(100);
+        read_photo_reflector();
+      }
+      Serial.println("PWM:128  ENB:HIGH");
+      motor_handler(  75,   75);
+      for(int i = 0; i < 100; i++){
+        delay(100);
+        read_photo_reflector();
+      }
+      Serial.println("PWM: 64  ENB:HIGH");
+      motor_handler(  0,   0);
+      for(int i = 0; i < 100; i++){
+        delay(100);
+        read_photo_reflector();
+      }
+      Serial.println("PWM:255  ENB:LOW");
+      motor_handler(-100, -100);
+      for(int i = 0; i < 100; i++){
+        delay(100);
+        read_photo_reflector();
+      }
+      Serial.println("PWM:128  ENB:LOW");
+      motor_handler( -75,  -75);
+      for(int i = 0; i < 100; i++){
+        delay(100);
+        read_photo_reflector();
+      }
+      Serial.println("PWM: 64  ENB:LOW");
+      motor_handler( -0,  -0);
+      for(int i = 0; i < 100; i++){
+        delay(100);
+        read_photo_reflector();
+      }
+      counter--;
+    }
+    Serial.println("==== drive test is finished.\n");
+  } else {
+    Serial.println("==== drive test was skipped.\n");
+  }
+}
+
 
 void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
     int startIndex = 0;
@@ -274,6 +341,51 @@ void checkAnalogRead(){
   }
 }
 
+void move_nnbFile(){
+
+  Serial.println("\n////////////////// nnb file /////////////////");
+  if (nnb_copy){
+    File readFile = theSD.open(nnbFile, FILE_READ);//flashPath
+    uint32_t file_size = readFile.size();
+    Serial.print("SD data file size = ");
+    Serial.println(file_size);
+    char *body = (char *)malloc(file_size);  // +1 is null char
+    if (body == NULL) {
+      Serial.println("No free memory");
+    }
+    int index = 0;
+    while (readFile.available()) {
+      body[index++] = readFile.read();
+    }
+    readFile.close();
+    //Flash.format();
+    Flash.mkdir(flashFolder);
+
+    if (Flash.exists(flashPath)) {
+      Flash.remove(flashPath);  // ファイルを削除
+    }
+    
+    File writeFile = Flash.open(flashPath, FILE_WRITE);
+    if (writeFile) {
+      Serial.println("nnb fileをフラッシュメモリ に書き込み中...");
+
+      // body のデータをフラッシュメモリに書き込む
+      writeFile.write((uint8_t*)body, file_size);
+
+      writeFile.close(); // ファイルを閉じる
+      Serial.println("nnb fileをフラッシュメモリへ書き込み完了");
+    } else {
+      // ファイルのオープンに失敗した場合
+      Serial.println("フラッシュメモリのファイルオープンに失敗しました");
+    }
+    free(body);
+  } else {
+    Serial.println("move nnb file passed.\n");
+  }
+  Serial.println("\n////////////////// nnb file end \\\\\\\\\\\\\\\\\\");
+
+}
+
 void parse_httpresponse(char *message) {
   char *p;
 
@@ -335,7 +447,6 @@ bool custom_post(const char *url_path, const char *body, uint32_t size) {
 
 }
 
-
 void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
  
   Serial.print("imgBuffer is available: ");
@@ -373,7 +484,7 @@ void camImagePost(){
       Serial.println("call takePicture()");
       CamImage img = theCamera.takePicture();
       Serial.println("======image info =========== @ cam Image post");
-      printPixInfomation(img);
+      //printPixInfomation(img);
 
       if (img.isAvailable()) {
         uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
@@ -462,6 +573,7 @@ void drawBox(uint16_t* imgBuf, const ClipRect& clip) {
 void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   // 画像をクロップしてリサイズ
 
+  /*
   Serial.println("\n==preprocessImage ===============");
 
   Serial.print("Clip Rect: ");
@@ -469,6 +581,7 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   Serial.print(", y: "); Serial.print(CAM_CLIP_Y);
   Serial.print(", width: "); Serial.print(CAM_CLIP_W);
   Serial.print(", height: "); Serial.println(CAM_CLIP_H);
+  */
 
   if (CAM_CLIP_X + CAM_CLIP_W > CAM_IMG_W || CAM_CLIP_Y + CAM_CLIP_H > CAM_IMG_H) {
       Serial.println("Error: Clip region exceeds image boundaries.");
@@ -481,7 +594,6 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
                                            clip.y + clip.height - 1, 
                                            DNN_IMG_W, DNN_IMG_H);
 
-  Serial.println(err);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
@@ -490,18 +602,18 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
     Serial.println("Error: Clip and Resize failed.");
     return;
   }
-  Serial.println("small infmation=====");
-  printPixInfomation(small);
+  //Serial.println("small infmation=====");
+  //printPixInfomation(small);
 
   // 画像フォーマットの変換
-  Serial.println("comvert SMALL");
+  //Serial.println("comvert SMALL");
   err = small.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
-  Serial.println(err);
+  //Serial.println(err);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
-  Serial.println("small infmation @after convert to RGB565=====");
-  printPixInfomation(small);
+  //Serial.println("small infmation @after convert to RGB565=====");
+  //printPixInfomation(small);
 
   uint16_t* tmp = (uint16_t*)small.getImgBuff();
 
@@ -534,7 +646,6 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
     dnnbuf[n] /= f_max;
   }
 }
-
 
 void printPixInfomation(CamImage& img) {
     // ピクセルフォーマットを取得して文字列に変換
@@ -640,17 +751,20 @@ void GS2200wifiSetup(){
 }
 
 void CamCB(CamImage img){
-  
-  Serial.println("CamCB Start ++++++++++++++++++ <<@CamCB>>");
-  printPixInfomation(img);
-  //preprocessImage(img, input, clipSet.clips[0]);
+  //Serial.println("->CamCB Call back");
+  if (!doInferrence) {
+    return;
+  }
+
+  Serial.println("\nCamCB Start ++++++++++++++++++ <<@CamCB>>");
+  //printPixInfomation(img);
 
   //変数初期化
 
   String gStrResult = "?";
   String maxLabel   = "?";
   int targetArea    = 0;
-  int maxIndex      = 0;
+  int maxIndex      = 24;
   float maxOutput   = 0.0;
   if (!img.isAvailable()) {
     Serial.println("Image is not available. Try again");
@@ -660,34 +774,33 @@ void CamCB(CamImage img){
   
   for (int i = 0; i < 17; i++) {
     delay(1000);
-    Serial.print("roop:");
-    Serial.println(i);
+
 
     preprocessImage(img, input, clipSet.clips[i]);
   
     startMicros = millis();
     dnnrt.inputVariable(input, 0);
     dnnrt.forward();
-    Serial.print("dnnrt output Size:");
+    //Serial.print("dnnrt output Size:");
     int size = dnnrt.outputSize(0);
-    Serial.println(size);
+    //Serial.println(size);
 
-    //DNNVariable output = dnnrt.outputVariable(0);
-  }
-/*
+    DNNVariable output = dnnrt.outputVariable(0);
+  
+
 
     endMicros = millis();
     elapsedTime = endMicros - startMicros;
 
 
-    Serial.print("Loop time: ");
-    Serial.print(elapsedTime);
-    Serial.println(" ms");
+    //Serial.print("elapsed time: ");
+    //Serial.print(elapsedTime);
+    //Serial.println(" ms");
 
     // text描画
     int index = output.maxIndex();
-    Serial.print("index:");
-    Serial.println(index);
+    //Serial.print("index:");
+    //Serial.println(index);
 
     if (i == 0){
       targetArea = 0;
@@ -716,27 +829,30 @@ void CamCB(CamImage img){
     if (output[index] >= threshold) {
       gStrResult = String(label[index]) + String(":") + String(output[index]);
     } else {
+
       gStrResult = "not identify";
     }
+    Serial.print("-->area:");
+    Serial.print(i);
+    Serial.print(" ");
     Serial.println(gStrResult);
   }
-  */
+  
 
-  Serial.println("total score======");
-  Serial.print("targetArea:");
+  Serial.println("\n****total score======");
+  Serial.print(" targetArea:");
   Serial.println(targetArea);
-  Serial.print("maxIndex:");
+  Serial.print(" maxIndex  :");
   Serial.println(maxIndex);
-  Serial.println(String(maxLabel) + String(":") + String(maxOutput));
-  Serial.println("=======================");
-  Serial.println("CamCB finished+++++++++++++++++++++++\n");
+  Serial.println(" label     :" + String(maxLabel));
+  Serial.println(" prbability:" + String(maxOutput));
+  Serial.println("****=================");
+  //Serial.println("CamCB finished+++++++++++++++++++++++\n");
+
+  doInferrence = false;
 }
 
-
-/* ---------------------------------------------------------------------
-* Setup Function
-* ----------------------------------------------------------------------
-*/
+// Setup Function 
 void setup() {
   /* Open serial communications and wait for port to open */
 
@@ -781,23 +897,11 @@ void setup() {
 
   GS2200wifiSetup();
   
-  /* -----------------------------------
-   * Camera Setup
-   * -----------------------------------
-   */
 
-  CamErr err;
-
-  /* begin() without parameters means that
-   * number of buffers = 1, 30FPS, QVGA, YUV 4:2:2 format */
+  //Camera Setup
 
   Serial.println("Prepare camera");
   err = theCamera.begin();
-  if (err != CAM_ERR_SUCCESS) {
-    printError(err);
-  }
-
-  err = theCamera.startStreaming(true, CamCB);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
@@ -811,15 +915,9 @@ void setup() {
 
   Serial.println("Set still picture format");
   err = theCamera.setStillPictureImageFormat(
-    //CAM_IMGSIZE_QUADVGA_H,      //1280
-    //CAM_IMGSIZE_QUADVGA_V,      //960
-    //CAM_IMGSIZE_VGA_H,          //640
-    //CAM_IMGSIZE_VGA_V,          //480
     CAM_IMGSIZE_QVGA_H,         //320
     CAM_IMGSIZE_QVGA_V,         //240
     CAM_IMAGE_PIX_FMT_JPG
-    //CAM_IMAGE_PIX_FMT_YUV422
-    //CAM_IMAGE_PIX_FMT_RGB565
     );
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
@@ -827,8 +925,11 @@ void setup() {
 
   digitalWrite(LED0, HIGH);  // turn on LED
 
+  //move_nnbFile();
   //uploadNNB();
   camImagePost();
+  checkAnalogRead();
+  checkDrive();
 
   if (autoStart){
     delay(START_TIMER);
@@ -836,6 +937,10 @@ void setup() {
     Serial.println("Begin Automatic Serch");
   }
 
+  err = theCamera.startStreaming(true, CamCB);
+  if (err != CAM_ERR_SUCCESS) {
+    printError(err);
+  }
 }
 
 void loop() {
@@ -844,8 +949,39 @@ void loop() {
   Serial.println("loop");
   Serial.println("");
 
-  checkMQTTtopic();
+  strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
+  mqtt.params.QoS = 0;
+  mqtt.params.retain = 0;
 
-  //camImagePost();
-			
+  // メッセージを準備
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "%d", 0); // デモ用に'0'を送信
+  mqtt.params.len = strlen(mqtt.params.message);
+  
+  if (theMqttGs2200.publish(&mqtt)) {
+      ConsolePrintf("送信されたメッセージ: %d\r\n", 0);
+  }
+
+  // MQTTクライアントに接続を試みる
+  /*
+  ConsoleLog("MQTTクライアントを開始");
+  if (theMqttGs2200.connect()) {
+    // メッセージをパブリッシュ
+    if (theMqttGs2200.publish(&mqtt)) {
+        ConsolePrintf("送信されたメッセージ: %d\r\n", 0);
+    }
+  } else {
+    ConsoleLog("MQTT接続に失敗しました");
+  }
+  */
+
+
+
+  checkMQTTtopic();
+  doInferrence = true;
+  camImagePost();
+
+  //read_photo_reflector();
+	
+
+
 }

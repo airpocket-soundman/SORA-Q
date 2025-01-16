@@ -1,19 +1,19 @@
 /* SORA-Q projeckt                                  
- ✔ ver.0.1.0 SDがある場合はFlashにファイルをコピーする
- ✔ ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
- ✔ ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
- ✔ Ver.0.2.0 MQTT受信追加
- ✔ Ver.0.3.0 motor_handler追加
- ✔ Ver.0.3.1 モータードライバmode 0化
- ✔ Ver.0.3.2 開閉ロック制御関数追加
- ✔           MQTTによる車輪ロックON/OFF機能
- ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
- ✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
- ✔ Ver.0.4.0 roop内から定期的に画像送信
-  Ver.0.4.1 CamCBの中でinferrenceする
- 
-  Ver.0.6.0 ラジコン走行
-  Ver.0.6.1 自動走行追加
+✔ ver.0.1.0 SDがある場合はFlashにファイルをコピーする
+✔ ver.0.1.1 SDが無い、NNBファイルが無い時の処理追加。フラッシュ保存先を変更したり処理が遅いのを調べたり<readbyteが遅い。起動時バージョン表示を追加
+✔ ver.0.1.2 D18,19.20,21のDout、A2,3のAin　テスト追加
+✔ Ver.0.2.0 MQTT受信追加
+✔ Ver.0.3.0 motor_handler追加
+✔ Ver.0.3.1 モータードライバmode 0化
+✔ Ver.0.3.2 開閉ロック制御関数追加
+✔           MQTTによる車輪ロックON/OFF機能
+✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
+✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
+✔ Ver.0.4.0 roop内から定期的に画像送信
+✔ Ver.0.4.1 CamCBの中でinferrenceする
+ Ver.0.4.2 inferrenceの有無をスイッチングする
+ Ver.0.6.0 ラジコン走行
+ Ver.0.6.1 自動走行追加
  */
 
 char version[] = "Ver.0.4.1";
@@ -123,6 +123,8 @@ bool nnb_copy = true;
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 char nnbFile[] = "model.nnb";
+bool doInferrence   = false;
+
 
 
 // auto start on/off
@@ -135,8 +137,7 @@ bool analogReadTest = false;
 bool driveTest      = false;
 
 // out put mode on/off
-bool photo_reflector_out = true;
-
+bool photo_reflector_out    = false;
 bool photo_reflector_left   = false;
 bool photo_reflector_right  = false;
 
@@ -867,8 +868,12 @@ void GS2200wifiSetup(){
 }
 
 void CamCB(CamImage img){
-  
-  Serial.println("CamCB Start ++++++++++++++++++ <<@CamCB>>");
+  Serial.println("->CamCB Call back");
+  if (!doInferrnce) {
+    return;
+  }
+
+  Serial.println("\nCamCB Start ++++++++++++++++++ <<@CamCB>>");
   printPixInfomation(img);
   //preprocessImage(img, input, clipSet.clips[0]);
 
@@ -1065,12 +1070,6 @@ void setup() {
     unlockWheels();
     Serial.println("Begin Automatic Serch");
   }
-
-  //Serial.println(">stop streaming<");
-  //err = theCamera.startStreaming(false, CamCB);
-  //if (err != CAM_ERR_SUCCESS) {
-  //  printError(err);
-  //}
 }
 
 void loop() {
