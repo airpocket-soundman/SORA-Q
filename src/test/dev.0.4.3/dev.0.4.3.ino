@@ -12,8 +12,8 @@
 ✔ Ver.0.4.0 roop内から定期的に画像送信
 ✔ Ver.0.4.1 CamCBの中でinferrenceする
 ✔ Ver.0.4.2 inferrenceの有無をスイッチングする
- Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする
- Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
+✔ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
+✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
  Ver.0.6.0 ラジコン走行
  Ver.0.6.1 自動走行追加
  */
@@ -22,7 +22,7 @@ char version[] = "Ver.0.4.1";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
-#include <MqttGs2200.h>
+#include "MqttGs2200_.h"
 #include <SDHCI.h>
 #include <TelitWiFi.h>
 #include <stdio.h> /* for sprintf */
@@ -67,6 +67,12 @@ float threshold = 0.2;
 DNNRT dnnrt;
 DNNVariable input(DNN_IMG_W*DNN_IMG_H);
 CamErr err;
+
+String gStrResult = "?";
+String maxLabel   = "?";
+int targetArea    = 0;
+int maxIndex      = 24;
+float maxOutput   = 0.0;
 
 //推論時間計測用
 unsigned long startMicros; // 処理開始時間を記録する変数
@@ -155,7 +161,31 @@ MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
 bool served = false;
 MQTTGS2200_Mqtt mqtt;
 
+void listFiles(File dir) {
+  if (!dir || !dir.isDirectory()) {
+    Serial.println("Failed to open directory");
+    return;
+  }
 
+  Serial.println("Listing files:");
+  while (true) {
+    File entry = dir.openNextFile();
+    if (!entry) {
+      break; // ファイルがなくなったら終了
+    }
+
+    if (entry.isDirectory()) {
+      Serial.print("DIR : ");
+      Serial.println(entry.name());
+    } else {
+      Serial.print("FILE: ");
+      Serial.print(entry.name());
+      Serial.print("  SIZE: ");
+      Serial.println(entry.size());
+    }
+    entry.close();
+  }
+}
 
 
 void motor_handler(int left_speed, int right_speed){
@@ -210,7 +240,6 @@ void unlockWheels(){
   motor_handler(   0,    0);
 }
 
-
 void checkDrive(){
 
   if (driveTest){
@@ -262,7 +291,6 @@ void checkDrive(){
     Serial.println("==== drive test was skipped.\n");
   }
 }
-
 
 void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
     int startIndex = 0;
@@ -438,8 +466,8 @@ bool custom_post(const char *url_path, const char *body, uint32_t size) {
   char size_string[10];
   snprintf(size_string, sizeof(size_string), "%d", size);
   theHttpGs2200.config(HTTP_HEADER_CONTENT_LENGTH, size_string);
-  Serial.println("Size");
-  Serial.println(size_string);
+  //Serial.println("Size");
+  //Serial.println(size_string);
 
   bool result = false;
   result = theHttpGs2200.connect();
@@ -749,7 +777,26 @@ void GS2200wifiSetup(){
   mqtt.params.retain = 0;
   if (true == theMqttGs2200.subscribe(&mqtt)) {
     ConsolePrintf( "Subscribed! \n" );
-  } 
+  }
+
+  strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
+  mqtt.params.QoS = 0;
+  mqtt.params.retain = 0;
+}
+
+// MQTTメッセージ送信
+void sendMqttMessage(const char* label, float probability) {
+  // label用メッセージの準備
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"label\":\"%s\"}", label);
+  printf("Sending JSON: %s\n", mqtt.params.message);
+  mqtt.params.len = strlen(mqtt.params.message);
+  theMqttGs2200.publish(&mqtt);
+
+  // probability用メッセージの準備
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"probability\":%f}", probability);
+  printf("Sending JSON: %s\n", mqtt.params.message);
+  mqtt.params.len = strlen(mqtt.params.message);
+  theMqttGs2200.publish(&mqtt);
 }
 
 void CamCB(CamImage img){
@@ -762,12 +809,12 @@ void CamCB(CamImage img){
   //printPixInfomation(img);
 
   //変数初期化
+  gStrResult = "?";
+  maxLabel   = "?";
+  targetArea = 0;
+  maxIndex   = 24;
+  maxOutput  = 0.0;
 
-  String gStrResult = "?";
-  String maxLabel   = "?";
-  int targetArea    = 0;
-  int maxIndex      = 24;
-  float maxOutput   = 0.0;
   if (!img.isAvailable()) {
     Serial.println("Image is not available. Try again");
     return;
@@ -788,8 +835,6 @@ void CamCB(CamImage img){
     //Serial.println(size);
 
     DNNVariable output = dnnrt.outputVariable(0);
-  
-
 
     endMicros = millis();
     elapsedTime = endMicros - startMicros;
@@ -801,11 +846,9 @@ void CamCB(CamImage img){
 
     // text描画
     int index = output.maxIndex();
-    //Serial.print("index:");
-    //Serial.println(index);
 
     if (i == 0){
-      targetArea = 0;
+      targetArea = i;
       maxIndex   = index;
       maxOutput  = output[index];
       maxLabel   = String(label[index]);
@@ -820,7 +863,7 @@ void CamCB(CamImage img){
         }
       }
       else {
-        if (output[index] > maxOutput){
+        if (output[index] > maxOutput && index != 24){
           targetArea = i;
           maxIndex   = index;
           maxOutput  = output[index];
@@ -828,12 +871,16 @@ void CamCB(CamImage img){
         }
       }
     }
-    if (output[index] >= threshold) {
-      gStrResult = String(label[index]) + String(":") + String(output[index]);
-    } else {
 
+    if (output[index] >= threshold) {
+      gStrResult = "index:" + String(index) + " " + String(label[index]) + ":" + String(output[index]) + " / targetArea:" + String(targetArea) +" / maxIndex:" + String(maxIndex) + " / maxOutput:" + String(maxOutput);
+    } else {
       gStrResult = "not identify";
     }
+    
+    Serial.print("index:");
+    Serial.print(index);
+    Serial.print("  /  ");
     Serial.print("-->area:");
     Serial.print(i);
     Serial.print(" ");
@@ -850,6 +897,7 @@ void CamCB(CamImage img){
   Serial.println(" prbability:" + String(maxOutput));
   Serial.println("****=================");
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
+  sendMqttMessage(maxLabel.c_str(), maxOutput);
 
   doInferrence = false;
 }
@@ -872,14 +920,24 @@ void setup() {
   }
 
     /* Initialize SD */
-  //if(!Flash.begin()) {
-  //  Serial.println("Flash card mount failed");
-  //}
+  if(!Flash.begin()) {
+    Serial.println("Flash card mount failed");
+  }
+
+  // ディレクトリを開く
+  File root = Flash.open("/data");
+  if (!root || !root.isDirectory()) {
+    Serial.println("Failed to open directory /data");
+    return;
+  }
+
+  // ファイル一覧を表示
+  listFiles(root);
 
   //SDカード接続時はnnbFile更新
-  //move_nnbFile();
-  //File nnbfile = Flash.open(flashPath);
-  File nnbfile = theSD.open("model.nnb");
+  move_nnbFile();
+  File nnbfile = Flash.open(flashPath);
+  //File nnbfile = theSD.open("model.nnb");
   int ret = dnnrt.begin(nnbfile);
   if (ret < 0) {
     Serial.println("dnnrt.begin failed" + String(ret));
@@ -898,7 +956,6 @@ void setup() {
   // GS2200 WiFi setup
 
   GS2200wifiSetup();
-  
 
   //Camera Setup
 
@@ -929,7 +986,7 @@ void setup() {
 
   //move_nnbFile();
   //uploadNNB();
-  camImagePost();
+  //camImagePost();
   checkAnalogRead();
   checkDrive();
 
@@ -951,39 +1008,16 @@ void loop() {
   Serial.println("loop");
   Serial.println("");
 
-  strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
-  mqtt.params.QoS = 0;
-  mqtt.params.retain = 0;
+  doInferrence = true;
+  //sendMqttMessage(maxLabel.c_str(), maxOutput);
 
-  // メッセージを準備
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "%d", 0); // デモ用に'0'を送信
-  mqtt.params.len = strlen(mqtt.params.message);
-  
-  if (theMqttGs2200.publish(&mqtt)) {
-      ConsolePrintf("送信されたメッセージ: %d\r\n", 0);
-  }
+  camImagePost();
+  delay(3000);
 
-  // MQTTクライアントに接続を試みる
-  /*
-  ConsoleLog("MQTTクライアントを開始");
-  if (theMqttGs2200.connect()) {
-    // メッセージをパブリッシュ
-    if (theMqttGs2200.publish(&mqtt)) {
-        ConsolePrintf("送信されたメッセージ: %d\r\n", 0);
-    }
-  } else {
-    ConsoleLog("MQTT接続に失敗しました");
-  }
-  */
-
-
+  Serial.println(maxLabel);
+  Serial.println(maxOutput);
 
   checkMQTTtopic();
-  doInferrence = true;
-  camImagePost();
 
   //read_photo_reflector();
-	
-
-
 }

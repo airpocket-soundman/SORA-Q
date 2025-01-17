@@ -176,7 +176,6 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
     dnnbuf[n] /= f_max;
   }
 
-  Serial.println("Preprocessing successful.");
   // 正常終了後、次の処理に進む
 }
 
@@ -195,7 +194,7 @@ void CamCB(CamImage img) {
 
   
   for (int i = 0; i < 17; i++) {
-    Serial.println(i);
+    //Serial.println(i);
 
     preprocessImage(img, input, clipSet.clips[i]);
 
@@ -207,20 +206,22 @@ void CamCB(CamImage img) {
     endMicros = millis();
     elapsedTime = endMicros - startMicros;
 
-    Serial.print("Loop time: ");
-    Serial.print(elapsedTime);
-    Serial.println(" ms");
+    //Serial.print("Loop time: ");
+    //Serial.print(elapsedTime);
+    //Serial.println(" ms");
 
     // text描画
     int index = output.maxIndex();
-    Serial.print("index:");
-    Serial.println(index);
+    //Serial.print("index:");
+    //Serial.println(index);
 
+    /*
     for(int j = 0;j < 25; j++){
       Serial.print(j);
       Serial.print(":");
       Serial.println(output[j]);
     }
+    */
 
     if (i == 0){
       targetArea = 0;
@@ -238,7 +239,7 @@ void CamCB(CamImage img) {
         }
       }
       else {
-        if (output[index] > maxOutput){
+        if (output[index] > maxOutput && index != 24){
           targetArea = i;
           maxIndex   = index;
           maxOutput  = output[index];
@@ -247,27 +248,33 @@ void CamCB(CamImage img) {
       }
     }
 
-
-
-
     if (output[index] >= threshold) {
-      gStrResult = String(label[index]) + String(":") + String(output[index]);
-    } else {
+      gStrResult = "index:" + String(index) + " " + String(label[index]) + ":" + String(output[index]) + " / targetArea:" + String(targetArea) +" / maxIndex:" + String(maxIndex) + " / maxOutput:" + String(maxOutput);
+    } 
+    else {
       gStrResult = "not identify";
     }
+    Serial.print("index:");
+    Serial.print(index);
+    Serial.print("  /  ");
+    Serial.print("-->area:");
+    Serial.print(i);
+    Serial.print(" ");
     Serial.println(gStrResult);
 
   }
 
 
 
-  Serial.println("total score======");
-  Serial.print("targetArea:");
+  Serial.println("\n****total score======");
+  Serial.print(" targetArea:");
   Serial.println(targetArea);
-  Serial.print("maxIndex:");
+  Serial.print(" maxIndex  :");
   Serial.println(maxIndex);
-  Serial.println(String(maxLabel) + String(":") + String(maxOutput));
-  Serial.println("=======================");
+  Serial.println(" label     :" + String(maxLabel));
+  Serial.println(" prbability:" + String(maxOutput));
+  Serial.println("****=================");
+  //Serial.println("CamCB finished+++++++++++++++++++++++\n");
 
   gStrResult = String(String(maxLabel) + String(":") + String(maxOutput));
   img.convertPixFormat(CAM_IMAGE_PIX_FMT_RGB565);
