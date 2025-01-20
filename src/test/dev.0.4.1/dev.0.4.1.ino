@@ -869,7 +869,7 @@ void GS2200wifiSetup(){
 
 void CamCB(CamImage img){
   Serial.println("->CamCB Call back");
-  if (!doInferrnce) {
+  if (!doInferrence) {
     return;
   }
 

@@ -18,7 +18,7 @@
  Ver.0.6.1 自動走行追加
  */
 
-char version[] = "Ver.0.4.1";
+char version[] = "Ver.0.4.3";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>

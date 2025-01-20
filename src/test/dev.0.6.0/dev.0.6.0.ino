@@ -14,7 +14,7 @@
 ✔ Ver.0.4.2 inferrenceの有無をスイッチングする
 ✔ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
 ✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
- Ver.0.6.0 ラジコン走行
+✔ Ver.0.6.0 SLIM探索
  Ver.0.6.1 自動走行追加
  */
 
@@ -191,7 +191,6 @@ void listFiles(File dir) {
   }
 }
 
-
 void motor_handler(int left_speed, int right_speed){
   char buffer[30];  // 十分なサイズのバッファを用意
   snprintf(buffer, sizeof(buffer), "SET left: %3d, Right: %3d", left_speed, right_speed);
@@ -210,10 +209,10 @@ void motor_handler(int left_speed, int right_speed){
   if (right_speed == 0){
     digitalWrite(IN1_RIGHT, LOW);
     digitalWrite(IN2_RIGHT, LOW);
-  } else if (left_speed > 0) {
+  } else if (right_speed > 0) {
     analogWrite(IN1_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
     digitalWrite(IN2_RIGHT, LOW);
-  } else if (left_speed < 0) {
+  } else if (right_speed < 0) {
     analogWrite(IN2_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
     digitalWrite(IN1_RIGHT, LOW);
   }
@@ -240,7 +239,7 @@ void lockWheels(){
 void unlockWheels(){
   Serial.println("unlock wheels");
   motor_handler(  75,   75);
-  delay(300);
+  delay(400);
   motor_handler(   0,    0);
 }
 
@@ -440,7 +439,7 @@ void move_nnbFile() {
     Serial.println("move nnb file passed.\n");
   }
 
-Serial.println("\n////////////////// nnb file end //////////////////////");
+  Serial.println("\n////////////////// nnb file end //////////////////////");
 
 }
 
@@ -817,8 +816,8 @@ void GS2200wifiSetup(){
 }
 
 // MQTTメッセージ送信
-void sendMqttMessage(const char* label, float probability, int targetArea) {
-  if (label == 24){
+void sendMqttMessage(const char* label, float probability, int targetArea, int maxIndex) {
+  if (maxIndex == 24){
     snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "not detected.");
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
@@ -884,7 +883,7 @@ void CamCB(CamImage img){
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
   for (int i = 0; i < 17; i++) {
-    delay(1000);
+    //delay(1000);
 
 
     preprocessImage(img, input, clipSet.clips[i]);
@@ -961,7 +960,7 @@ void CamCB(CamImage img){
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
 
 
-  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea);
+  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
 
   if (selectedImageOnly){
     if (maxIndex != 24){
@@ -969,7 +968,7 @@ void CamCB(CamImage img){
     }
   }
   else {
-    imagePost = true;
+    imagePost = false;
   }
   doInferrence = false;
   waitInferrence = false;
@@ -1068,9 +1067,9 @@ void setup() {
     printError(err);
   }
 
-  delay(3000);
+  delay(20000);
   lockWheels();
-  delay(3000);
+  delay(15000);
   unlockWheels();
 
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
@@ -1107,9 +1106,9 @@ void loop() {
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
     theMqttGs2200.publish(&mqtt);
-
-    delay(5000);
-
+    motor_handler(   25,   50);
+    delay(1000);
+    motor_handler(   0,    0);
     snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Movement ended.");
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);

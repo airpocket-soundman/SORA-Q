@@ -145,8 +145,7 @@ bool driveTest         = false;
 bool selectedImageOnly = true;
 bool imagePost         = false;
 bool detectedSLIM      = false;
-bool autoSerch         = true;    //SLIM探索を行う
-bool waitInferrence    = true;    //推論を待つ
+bool autoSerch         = true;
 
 // out put mode on/off
 bool photo_reflector_out    = false;
@@ -814,7 +813,18 @@ void GS2200wifiSetup(){
   strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
   mqtt.params.QoS = 0;
   mqtt.params.retain = 0;
+
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
+  printf("Sending JSON: %s\n", mqtt.params.message);
+  mqtt.params.len = strlen(mqtt.params.message);
+  theMqttGs2200.publish(&mqtt);
+
 }
+
+
+
+
+
 
 // MQTTメッセージ送信
 void sendMqttMessage(const char* label, float probability, int targetArea) {
@@ -855,10 +865,6 @@ void CamCB(CamImage img){
   if (!doInferrence) {
     return;
   }
-  
-  waitInferrence = true;
-
-  
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Taking photos.");
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
@@ -972,8 +978,7 @@ void CamCB(CamImage img){
     imagePost = true;
   }
   doInferrence = false;
-  waitInferrence = false;
-  delay(2000);
+
 }
 
 // Setup Function 
@@ -1063,23 +1068,16 @@ void setup() {
   checkAnalogRead();
   checkDrive();
 
+  if (autoStart){
+    delay(START_TIMER);
+    unlockWheels();
+    Serial.println("Begin Automatic Serch");
+  }
+
   err = theCamera.startStreaming(true, CamCB);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
-
-  delay(3000);
-  lockWheels();
-  delay(3000);
-  unlockWheels();
-
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
-  delay(3000);
-  doInferrence = true;
-
 }
 
 void loop() {
@@ -1091,7 +1089,7 @@ void loop() {
   checkMQTTtopic();
 
   if (autoSerch){
-    
+    doInferrence = true;
     //sendMqttMessage(maxLabel.c_str(), maxOutput);
 
     if (imagePost == true){
@@ -1102,7 +1100,7 @@ void loop() {
 
     
 
-    if (!detectedSLIM && !waitInferrence ){
+    if (!detectedSLIM){
     snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Moving");
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
@@ -1114,7 +1112,6 @@ void loop() {
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
     theMqttGs2200.publish(&mqtt);
-    doInferrence = true;
     }
   }
   //read_photo_reflector();

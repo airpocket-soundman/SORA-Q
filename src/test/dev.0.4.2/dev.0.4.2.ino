@@ -962,21 +962,7 @@ void loop() {
       ConsolePrintf("送信されたメッセージ: %d\r\n", 0);
   }
 
-  // MQTTクライアントに接続を試みる
-  /*
-  ConsoleLog("MQTTクライアントを開始");
-  if (theMqttGs2200.connect()) {
-    // メッセージをパブリッシュ
-    if (theMqttGs2200.publish(&mqtt)) {
-        ConsolePrintf("送信されたメッセージ: %d\r\n", 0);
-    }
-  } else {
-    ConsoleLog("MQTT接続に失敗しました");
-  }
-  */
-
-
-
+ 
   checkMQTTtopic();
   doInferrence = true;
   camImagePost();
