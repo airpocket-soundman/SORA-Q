@@ -215,9 +215,12 @@ void splitString(String input, String &var1, String &var2, String &var3, String 
 }
 
 void checkMQTTtopic(){ 
+  Serial.println("check mqtt topic");
   String data;
+  //Serial.println(theMqttGs2200.receive(data));
   /* just in case something from GS2200 */
   while (gs2200.available()) {
+    Serial.println("available");
     if (false == theMqttGs2200.receive(data)) {
       served = false; // quite the loop
       break;
@@ -479,15 +482,14 @@ void GS2200wifiSetup(){
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
 
   /* Initialize SPI access of GS2200 */
-  Init_GS2200_SPI_type(iS110B_TypeA);
+  Init_GS2200_SPI_type(iS110B_TypeC);
 
   /* Initialize AT Command Library Buffer */
   gsparams.mode = ATCMD_MODE_STATION;
   gsparams.psave = ATCMD_PSAVE_DEFAULT;
   if (gs2200.begin(gsparams)) {
     Serial.println("GS2200 Initilization Fails");
-    while (1)
-      ;
+    while (1);
   }
 
   /* GS2200 Association to AP */
@@ -512,6 +514,7 @@ void GS2200wifiSetup(){
   mqttHostParams.password = NULL;                     // パスワード（使用しない場合はNULL）
   theMqttGs2200.begin(&mqttHostParams);               // MQTTクライアントを初期化
 
+  
   ConsoleLog( "Start MQTT Client");
   if (false == theMqttGs2200.connect()) {
     return;
@@ -527,9 +530,7 @@ void GS2200wifiSetup(){
   mqtt.params.retain = 0;
   if (true == theMqttGs2200.subscribe(&mqtt)) {
     ConsolePrintf( "Subscribed! \n" );
-  } 
-
-
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -625,8 +626,8 @@ void setup() {
 
 
 void loop() {
-  //delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
-  //Serial.println("loop");
+  delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
+  Serial.println("loop");
   checkMQTTtopic();
   //read_photo_reflector();
 
