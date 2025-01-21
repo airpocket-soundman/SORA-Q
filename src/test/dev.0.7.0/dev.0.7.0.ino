@@ -18,7 +18,7 @@
  Ver.0.6.1 自動走行追加
  */
 
-char version[] = "Ver.0.6.0";
+char version[] = "Ver.0.7.0";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -534,6 +534,7 @@ void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
 
 /* カメラ撮影とhttp request postのテスト*/
 void camImagePost(){
+
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"image\":\"%s\"}", "image sending.");
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
@@ -882,7 +883,7 @@ void CamCB(CamImage img){
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
   for (int i = 0; i < 17; i++) {
-    delay(1000);
+    //delay(1000);
 
 
     preprocessImage(img, input, clipSet.clips[i]);
@@ -1075,7 +1076,7 @@ void setup() {
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
-  delay(3000);
+  //delay(3000);
   doInferrence = true;
 
 }
@@ -1090,8 +1091,6 @@ void loop() {
 
   if (autoSerch){
     
-    //sendMqttMessage(maxLabel.c_str(), maxOutput);
-
     if (imagePost == true){
       camImagePost();
     }
