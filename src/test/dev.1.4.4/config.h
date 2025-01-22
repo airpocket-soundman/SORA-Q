@@ -23,6 +23,7 @@
 // is110のRev設定
 #define iS110_TYPEC   //is110_TYPEA, is110_TYPEB, is110_TYPEC, 
 
+
 #define WORK //HOME, HOME3A. WORK, WORK3A or NOTE3A
 
 #ifdef HOME
@@ -71,6 +72,6 @@
 
 #define  MQTT_PORT     "1883"
 #define  MQTT_CLI_ID   "Telit_Device_pub"
-#define  MQTT_TOPIC1   "fromNodeRed"
+#define  MQTT_TOPIC   "fromNodeRed"
 
 #endif /*_CONFIG_H_*/
