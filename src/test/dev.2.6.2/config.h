@@ -20,7 +20,9 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-//#define HOME //HOME, HOME3A. WORK, WORK3A or NOTE3A
+// is110のRev設定
+#define iS110_TYPEC   //is110_TYPEA, is110_TYPEB, is110_TYPEC, 
+
 
 #define WORK //HOME, HOME3A. WORK, WORK3A or NOTE3A
 
@@ -60,7 +62,6 @@
 #define  HTTP_SRVR_IP   "192.168.137.1"
 #define  MQTT_SRVR      "192.168.137.1"
 
-
 #else
 #error "No configuration defined. Please define HOME, WORK, or NOTE."
 #endif
@@ -68,9 +69,11 @@
 #define  HTTP_PORT      "1880"
 #define  HTTP_GET_PATH  "/getdata"
 #define  HTTP_POST_PATH "/postdata"
+#define  HTTP_POST_TEXT_PATH "/posttxt"
 
 #define  MQTT_PORT     "1883"
 #define  MQTT_CLI_ID   "Telit_Device_pub"
 #define  MQTT_TOPIC1   "fromNodeRed"
+//#define  MQTT_TOPIC2   "fromSORAQ"
 
 #endif /*_CONFIG_H_*/

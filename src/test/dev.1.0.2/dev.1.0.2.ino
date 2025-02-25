@@ -1,10 +1,10 @@
 /*
 ✔ Ver.1.0.0 MQTTサブスクライブ関数化
 ✔ Ver.1.0.1 MQTTでストリーミングをスイッチンぐしつつCamCBで撮影してpost txtもpost
-Ver.1.0.2 dnnモデル保存を追加
+✔ Ver.1.0.2 MQTTにsendImageコマンド追加dnnモデル保存を追加
 
 */
-char version[] = "Ver.1.0.1";
+char version[] = "Ver.1.0.2";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -15,6 +15,7 @@ char version[] = "Ver.1.0.1";
 #include <Camera.h>
 #include "config.h"
 #include <Flash.h>
+#include <DNNRT.h>
 
 #define  CONSOLE_BAUDRATE  115200
 #define  SUBSCRIBE_TIMEOUT 60000	//ms
@@ -37,6 +38,29 @@ MQTTGS2200_Mqtt mqtt;
 const uint16_t RECEIVE_PACKET_SIZE = 1500;
 uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
 
+
+//SD
+SDClass theSD;
+char flashPath[] = "data/slim.nnb";
+char flashFolder[] = "data/";
+char nnbFile[] = "model.nnb";
+bool doInferrence   = false;
+
+
+// イメージ設定
+#define DNN_IMG_W 28
+#define DNN_IMG_H 28
+#define CAM_IMG_W 320
+#define CAM_IMG_H 240
+#define CAM_CLIP_X 96//96
+#define CAM_CLIP_Y 0//64
+#define CAM_CLIP_W 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
+#define CAM_CLIP_H 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
+
+//DNN
+float threshold = 0.2;
+DNNRT dnnrt;
+DNNVariable input(DNN_IMG_W*DNN_IMG_H);
 
 void printError(enum CamErr err) {
   Serial.print("Error: ");
@@ -139,7 +163,6 @@ bool uploadString(const String &body) {
   return true;
 }
 
-
 void camImagePost(){
   CamImage imgStill = theCamera.takePicture();
 
@@ -184,11 +207,12 @@ void subscribeMQTT() {
 		served = true;
 	} else {
 		uint64_t start = millis();
-		while (served) {
+    while (served) {
 			if (msDelta(start) < SUBSCRIBE_TIMEOUT) {
 				String data;
 				/* just in case something from GS2200 */
 				while (gs2200.available()) {
+          Serial.println("mqtt loop");
 					if (false == theMqttGs2200.receive(data)) {
 						served = false; // quit the loop
 						break;
@@ -210,9 +234,10 @@ void subscribeMQTT() {
             if (err != CAM_ERR_SUCCESS) {
               printError(err);
             }
+
           } else if (data == "sendImage"){
             Serial.println("command send Image");
-            camImagePost()
+            camImagePost();
           }
 
           
@@ -233,7 +258,88 @@ void CamCB(CamImage img){
   Serial.println("->CamCB Call back");
 }
 
+//microSDに model.nnb が存在するとき、推論用モデルをflashメモリにコピーする
+void move_nnbFile() {
+  Serial.println("\n////////////////// nnb file /////////////////");
 
+  if (nnb_copy) {
+    File readFile = theSD.open(nnbFile, FILE_READ);
+    uint32_t file_size = readFile.size();
+    Serial.print("SD data file size = ");
+    Serial.println(file_size);
+    char *body = (char *)malloc(file_size);
+
+    if (body == NULL) {
+      Serial.println("メモリ確保に失敗しました");
+      return;
+    }
+
+    int index = 0;
+    while (readFile.available()) {
+      body[index++] = readFile.read();
+    }
+    readFile.close();
+
+    Flash.mkdir(flashFolder);
+
+    if (Flash.exists(flashPath)) {
+      Flash.remove(flashPath);  // ファイルを削除
+    }
+
+    File writeFile = Flash.open(flashPath, FILE_WRITE);
+    if (writeFile) {
+      Serial.println("nnb fileをフラッシュメモリに書き込み中...");
+
+      size_t written = writeFile.write((uint8_t*)body, file_size);
+      if (written != file_size) {
+        Serial.println("ファイルの書き込みに失敗しました");
+      } else {
+        Serial.println("nnb fileをフラッシュメモリへ書き込み完了");
+      }
+
+      writeFile.close();
+
+      // フラッシュメモリに保存されたファイルのサイズを表示
+      File flashFile = Flash.open(flashPath, FILE_READ);
+      if (flashFile) {
+        uint32_t flashFileSize = flashFile.size();
+        Serial.print("フラッシュメモリのファイルサイズ = ");
+        Serial.println(flashFileSize);
+        flashFile.close();
+      } else {
+        Serial.println("フラッシュメモリのファイルオープンに失敗しました");
+      }
+    } else {
+      Serial.println("フラッシュメモリのファイルオープンに失敗しました");
+    }
+
+    free(body);
+  } else {
+    Serial.println("move nnb file passed.\n");
+  }
+
+  Serial.println("\n////////////////// nnb file end //////////////////////");
+
+}
+
+void NNBModelSetup(){
+  /* Initialize SD */
+  Serial.println("theSD.begin()");
+  if(!theSD.begin()) {
+    Serial.println("SD card mount failed");
+    nnb_copy = false;
+  }
+
+    /* Initialize SD */
+  if(!Flash.begin()) {
+    Serial.println("Flash card mount failed");
+  }
+  //SDカード接続時はnnbFile更新
+  move_nnbFile();
+
+  File nnbfile = Flash.open(flashPath);
+  //File nnbfile = theSD.open("model.nnb");  //microSDからnnbファイルを読み取る場合ｆ
+}
 
 // the setup function runs once when you press reset or power the board
 void setup() {
@@ -244,7 +350,8 @@ void setup() {
 	Serial.begin( CONSOLE_BAUDRATE ); // talk to PC
   Serial.println(version);
 
-	/* Initialize SPI access of GS2200 */
+  // Wi-Fi setup =====================================================
+	/* iS110BのRevに合わせて初期化*/
   #if defined(iS110_TYPEA)
     Init_GS2200_SPI_type(iS110B_TypeA);
   #elif defined(iS110_TYPEB)
@@ -277,7 +384,6 @@ void setup() {
   theHttpGs2200.config(HTTP_HEADER_HOST, HTTP_SRVR_IP);
   theHttpGs2200.config(HTTP_HEADER_CONTENT_TYPE, "application/octet-stream");
 
-
 	mqttHostParams.host = (char *)MQTT_SRVR;
 	mqttHostParams.port = (char *)MQTT_PORT;
 	mqttHostParams.clientID = (char *)MQTT_CLI_ID;
@@ -300,7 +406,7 @@ void setup() {
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
-
+  /* カメラ画像サイズ設定 */
   Serial.println("Set still picture format");
   err = theCamera.setStillPictureImageFormat(
     CAM_IMGSIZE_QVGA_H,         //320
@@ -310,9 +416,16 @@ void setup() {
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
+
+  // NNB model setup
+  NNBModelSetup();
+  File nnbfile = Flash.open(flashPath);
+  int ret = dnnrt.begin(nnbfile);
+  if (ret < 0) {
+    Serial.println("dnnrt.begin failed" + String(ret));
+    return;
+  }
 }
-
-
 
 // the loop function runs over and over again forever
 void loop() {

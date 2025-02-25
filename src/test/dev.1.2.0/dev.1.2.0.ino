@@ -7,50 +7,53 @@
  */
 
 char version[] = "Ver.0.2.0";
+#include "config.h"
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
 #include <MqttGs2200.h>
-#include <SDHCI.h>
 #include <TelitWiFi.h>
+
 #include <stdio.h> /* for sprintf */
+
 #include <Camera.h>
-#include "config.h"
+#include <DNNRT.h>
 #include <Flash.h>
+#include <SDHCI.h>
+
 
 #define CONSOLE_BAUDRATE 115200
-#define TOTAL_PICTURE_COUNT 3
 #define PICTURE_INTERVAL 1000
 #define FIRST_INTERVAL 3000
 #define SUBSCRIBE_TIMEOUT 60000	//ms
 
 #define AIN1 A2       //左車輪エンコーダ
 #define AIN2 A3       //右車輪エンコーダ
-#define PWM1 21       //左車輪出力
-#define PWM2 19       //右車輪出力
-#define ENB1 20       //左車輪方向
-#define ENB2 18       //右車輪方向
+#define IN1_LEFT  14//19       //左車輪出力
+#define IN1_RIGHT 15//21       //右車輪出力
+#define IN2_LEFT  18       //左車輪方向
+#define IN2_RIGHT 20       //右車輪方向
+#define PHOTO_REFLECTOR_THRETHOLD_LEFT  100
+#define PHOTO_REFLECTOR_THRETHOLD_RIGHT 100
 
 const uint16_t RECEIVE_PACKET_SIZE = 1500;
 uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
 bool nnb_copy = true;
 
-char nnbFile[] = "airpocket_newlogo.jpg";
-char flashPath[] = "data/slim.nnb";
-char flashFolder[] = "data/";
-//char nnbFile[] = "slim.nnb";
-
-String param1, param2, param3, param4, param5, param6;
-
 TelitWiFi gs2200;
 TWIFI_Params gsparams;
 HttpGs2200 theHttpGs2200(&gs2200);
 HTTPGS2200_HostParams httpHostParams; // HTTPサーバ接続用のホストパラメータ
-SDClass theSD;
+
 MqttGs2200 theMqttGs2200(&gs2200);
 MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
 bool served = false;
 MQTTGS2200_Mqtt mqtt;
+
+SDClass theSD;
+char nnbFile[] = "model.nnb";
+char flashPath[] = "data/slim.nnb";
+char flashFolder[] = "data/";
 
 // test mode on/off
 bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
@@ -58,62 +61,156 @@ bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
 bool analogReadTest = false;
 bool driveTest      = true;
 
+
+// イメージ設定
+#define DNN_IMG_W 28
+#define DNN_IMG_H 28
+#define CAM_IMG_W 320
+#define CAM_IMG_H 240
+#define CAM_CLIP_X 96//96
+#define CAM_CLIP_Y 0//64
+#define CAM_CLIP_W 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
+#define CAM_CLIP_H 224//112 //DNN_IMGのn倍であること(clipAndResizeImageByHWの制約)
+
+//DNN
+float threshold = 0.2;
+DNNRT dnnrt;
+DNNVariable input(DNN_IMG_W*DNN_IMG_H);
+
+
+//serch slim
+bool autoSerch          = false;
+bool waitInferrence     = true;    //推論を待つ
+bool imagePost         = false;
+bool detectedSLIM      = false;
+bool doInferrence      = false;
+bool selectedImageOnly = true;
+String gStrResult = "?";
+String maxLabel   = "?";
+int targetArea    = 0;
+int maxIndex      = 24;
+float maxOutput   = 0.0;
+
+
+bool doLockWheels = false;
+bool doUnLockWheels = false;
+
+//推論時間計測用
+unsigned long startMicros; // 処理開始時間を記録する変数
+unsigned long endMicros;   // 処理終了時間を記録する変数
+unsigned long elapsedTime;    // 処理時間を記録する変数
+
+//カメライメージ操作用
+volatile bool newImageAvailable = false;  // 新しい画像があるかどうかのフラグ
+String messageStr = "";
+
+//フォトリフレクタの値を格納すする構造体
+struct PhotoReflectorState {
+    bool left;
+    bool right;
+};
+
+//static uint8_t const label[2]= {0,1};
+static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_R3", 
+                                "Bottom_R0",  "Bottom_R1",  "Bottom_R2",  "Bottom_R3", 
+                                "Front_R0",   "Front_R1",   "Front_R2",   "Front_R3",
+                                "Left_R0",    "Left_R1",    "Left_R2",    "Left_R3",
+                                "Right_R0",   "Right_R1",   "Right_R2",   "Right_R3",
+                                "Top_R0",     "Top_R1",     "Top_R2",     "Top_R3",
+                                "empty"};
+
+
+//画像クロップ領域指定
+struct ClipRect {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
+struct ClipRectSet {
+    ClipRect clips[17];  // 5つのクロップ領域を格納する配列
+};
+
+ClipRectSet clipSet = {
+    {
+        {  0,   0, 224, 224}, //  0:large 1
+        { 96,   0, 224, 224}, //  1:large 2
+        {  0,   0, 112, 112}, //  2:small 1
+        {  0,  56, 112, 112}, //  3:small 2
+        {  0, 112, 112, 112}, //  4:small 3
+        { 56,   0, 112, 112}, //  5:small 4
+        { 56,  56, 112, 112}, //  6:small 5
+        { 56, 112, 112, 112}, //  7:small 6
+        {112,   0, 112, 112}, //  8:small 7
+        {112,  56, 112, 112}, //  9:small 8
+        {112, 112, 112, 112}, // 10:small 9
+        {168,   0, 112, 112}, // 11:small 10
+        {168,  56, 112, 112}, // 12:small 11
+        {168, 112, 112, 112}, // 13:small 12
+        {208,   0, 112, 112}, // 14:small 13
+        {208,  56, 112, 112}, // 15:small 14
+        {208, 112, 112, 112}, // 16:small 15
+
+    }
+};
+
 void checkDrive(){
 
   if (driveTest){
     Serial.println("==== drive test start");
-    int counter = 10;
+    int counter = 1;
     while(counter > 0){
       Serial.print("counter = ");
       Serial.println(counter);
       Serial.println("PWM:255  ENB:HIGH");
-      analogWrite(PWM1,255);
-      analogWrite(PWM2,255);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
-      delay(10000);
+      analogWrite(IN1_LEFT,255);
+      analogWrite(IN1_RIGHT,255);
+      digitalWrite(IN2_LEFT,HIGH);
+      digitalWrite(IN2_RIGHT,HIGH);
+      delay(1000);
       Serial.println("PWM:128  ENB:HIGH");
-      analogWrite(PWM1,128);
-      analogWrite(PWM2,128);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
-      delay(10000);
+      analogWrite(IN1_LEFT,128);
+      analogWrite(IN1_RIGHT,128);
+      digitalWrite(IN2_LEFT,HIGH);
+      digitalWrite(IN2_RIGHT,HIGH);
+      delay(1000);
       Serial.println("PWM: 64  ENB:HIGH");
-      analogWrite(PWM1,64);
-      analogWrite(PWM2,64);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
-      delay(10000);
+      analogWrite(IN1_LEFT,64);
+      analogWrite(IN1_RIGHT,64);
+      digitalWrite(IN2_LEFT,HIGH);
+      digitalWrite(IN2_RIGHT,HIGH);
+      delay(1000);
       Serial.println("PWM:  0  ENB:HIGH");
-      analogWrite(PWM1,32);
-      analogWrite(PWM2,32);
-      digitalWrite(ENB1,HIGH);
-      digitalWrite(ENB2,HIGH);
-      delay(10000);
+      analogWrite(IN1_LEFT,32);
+      analogWrite(IN1_RIGHT,32);
+      digitalWrite(IN2_LEFT,HIGH);
+      digitalWrite(IN2_RIGHT,HIGH);
+      delay(1000);
       Serial.println("PWM:255  ENB:LOW");
-      analogWrite(PWM1,255);
-      analogWrite(PWM2,255);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
-      delay(10000);
+      analogWrite(IN1_LEFT,255);
+      analogWrite(IN1_RIGHT,255);
+      digitalWrite(IN2_LEFT,LOW);
+      digitalWrite(IN2_RIGHT,LOW);
+      delay(1000);
       Serial.println("PWM:128  ENB:LOW");
-      analogWrite(PWM1,128);
-      analogWrite(PWM2,128);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
-      delay(10000);
+      analogWrite(IN1_LEFT,128);
+      analogWrite(IN1_RIGHT,128);
+      digitalWrite(IN2_LEFT,LOW);
+      digitalWrite(IN2_RIGHT,LOW);
+      delay(1000);
       Serial.println("PWM: 64  ENB:LOW");
-      analogWrite(PWM1,64);
-      analogWrite(PWM2,64);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
-      delay(10000);
+      analogWrite(IN1_LEFT,64);
+      analogWrite(IN1_RIGHT,64);
+      digitalWrite(IN2_LEFT,LOW);
+      digitalWrite(IN2_RIGHT,LOW);
+      delay(1000);
       Serial.println("PWM:  0  ENB:LOW");
-      analogWrite(PWM1,32);
-      analogWrite(PWM2,32);
-      digitalWrite(ENB1,LOW);
-      digitalWrite(ENB2,LOW);
-      delay(10000);
+      analogWrite(IN1_LEFT,32);
+      analogWrite(IN1_RIGHT,32);
+      digitalWrite(IN2_LEFT,LOW);
+      digitalWrite(IN2_RIGHT,LOW);
+      delay(1000);
       counter--;
     }
     Serial.println("==== drive test is finished.\n");
@@ -122,60 +219,6 @@ void checkDrive(){
   }
 
   
-}
-
-
-void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
-    int startIndex = 0;
-    int commaIndex;
-    int varCount = 0;
-
-    while ((commaIndex = input.indexOf(',', startIndex)) != -1 && varCount < 5) {
-        if (varCount == 0) {
-            var1 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 1) {
-            var2 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 2) {
-            var3 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 3) {
-            var4 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 4) {
-            var5 = input.substring(startIndex, commaIndex);
-        }
-        startIndex = commaIndex + 1;
-        varCount++;
-    }
-    
-    // 最後の変数に残りの部分を格納
-    if (varCount < 6) {
-        var6 = input.substring(startIndex);
-    } else {
-        var6 = ""; // 余った部分がない場合
-    }
-}
-
-void checkMQTTtopic(){ 
-  String data;
-  /* just in case something from GS2200 */
-  while (gs2200.available()) {
-    if (false == theMqttGs2200.receive(data)) {
-      served = false; // quite the loop
-      break;
-    }
-
-    Serial.println("Recieve data: " + data);
-    
-    // dataをパース
-    splitString(data, param1, param2, param3, param4, param5, param6);
-    
-    Serial.println("param 1: " + param1);
-    Serial.println("param 2: " + param2);
-    Serial.println("param 3: " + param3);
-    Serial.println("param 4: " + param4);
-    Serial.println("param 5: " + param5);
-    Serial.println("param 6: " + param6);
-
-  }
 }
 
 void checkAnalogRead(){
@@ -198,6 +241,48 @@ void checkAnalogRead(){
     Serial.println("==== analog read test was skipped.\n");
   }
 }
+
+void motor_handler(int left_speed, int right_speed){
+  char buffer[30];  // 十分なサイズのバッファを用意
+  snprintf(buffer, sizeof(buffer), "SET left: %3d, Right: %3d", left_speed, right_speed);
+  Serial.println(buffer);
+  if (left_speed == 0){
+    digitalWrite(IN1_LEFT, LOW);
+    digitalWrite(IN2_LEFT, LOW);
+  } else if (left_speed < 0) {
+    //analogWrite(IN1_LEFT,   map(abs(left_speed),  0, 100, 0, 255));
+    digitalWrite(IN2_LEFT, LOW);
+  } else if (left_speed > 0) {
+    //analogWrite(IN2_LEFT,   map(abs(left_speed),  0, 100, 0, 255));
+    digitalWrite(IN1_LEFT, LOW);
+  }
+
+  if (right_speed == 0){
+    digitalWrite(IN1_RIGHT, LOW);
+    digitalWrite(IN2_RIGHT, LOW);
+  } else if (right_speed > 0) {
+    //analogWrite(IN1_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
+    digitalWrite(IN2_RIGHT, LOW);
+  } else if (right_speed < 0) {
+    //analogWrite(IN2_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
+    digitalWrite(IN1_RIGHT, LOW);
+  }
+}
+
+void lockWheels() {
+  Serial.println("lock wheels");
+  motor_handler(-75, -75);
+  delay(400);
+  motor_handler(0, 0);
+}
+
+void unLockWheels(){
+  Serial.println("unlock wheels");
+  motor_handler(  75,   75);
+  delay(400);
+  motor_handler(   0,    0);
+}
+
 
 void move_nnbFile(){
   if (nnb_copy){
@@ -334,77 +419,15 @@ void uploadImage(CamImage img) {
 
 /* カメラ撮影とhttp request postのテスト*/
 void camImagePost(){
-  if (imgPostTest){
-    Serial.println("==== start Camera Image Post Test");
-    int take_picture_count = 0;
-    while (take_picture_count < TOTAL_PICTURE_COUNT) {
-      Serial.println("call takePicture()");
-      CamImage img = theCamera.takePicture();
+  Serial.println("call takePicture()");
+  CamImage img = theCamera.takePicture();
 
-      if (img.isAvailable()) {
-        uploadImage(img);
-      } else {
-        Serial.println("Failed to take picture");
-      }
-    take_picture_count++;
-    }
-    theCamera.end();
-    Serial.println("==== cam Image Post test is finished.\n");
+  if (img.isAvailable()) {
+    uploadImage(img);
   } else {
-    Serial.println("==== cam Image Post test was passed.\n");
+    Serial.println("Failed to take picture");
   }
-}
-
-void uploadNNB() {
-  if (nnbFilePost){
-    Serial.println("===== start NNB file post");
-    File file = Flash.open(flashPath, FILE_READ);
-    Serial.println("flash opened");
-    if (file){
-      // Calculate size in byte
-      uint32_t file_size = file.size();
-      Serial.println(file_size);
-      // Define_a body pointer having the continuous memory space with size `file_size`
-      char *body = (char *)malloc(file_size);  // +1 is null char
-      if (body == NULL) {
-        Serial.println("No free memory");
-      }
-      Serial.println("nnb read byte");
-      // Read byte of the file iteratively and put it in the address where each member of body pointer points out
-      int index = 0;
-      while (file.available()) {
-        body[index++] = file.read();
-      }
-      file.close();
-      Serial.println("nnb read finished");
-      // Send the body data to the server
-      bool result = custom_post(HTTP_POST_PATH, body, file_size);
-      if (false == result) {
-        Serial.println("Post Failed");
-      }
-      free(body);
-      Serial.println("custom_post finished");
-      result = false;
-      do {
-        result = theHttpGs2200.receive(5000);
-        if (result) {
-          theHttpGs2200.read_data(Receive_Data, RECEIVE_PACKET_SIZE);
-          ConsolePrintf("%s", (char *)(Receive_Data));
-        } else {
-          // AT+HTTPSEND command is done
-          Serial.println("\r\n");
-        }
-      } while (result);
-
-      result = theHttpGs2200.end();
-      Serial.println("NNBファイル送信完了======================= \n");
-    } else {
-      Serial.println("nnbファイルがありません \n");
-    }
-
-  } else {
-  Serial.println("==== nnb file post is skipped.\n");
-  }
+  //theCamera.end();
 }
 
 /* wifi Setup */
@@ -413,8 +436,17 @@ void GS2200wifiSetup(){
   pinMode(LED0, OUTPUT);
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
 
-  /* Initialize SPI access of GS2200 */
-  Init_GS2200_SPI_type(iS110B_TypeC);
+  // Wi-Fi setup =====================================================
+	/* iS110BのRevに合わせて初期化*/
+  #if defined(iS110_TYPEA)
+    Init_GS2200_SPI_type(iS110B_TypeA);
+  #elif defined(iS110_TYPEB)
+    Init_GS2200_SPI_type(iS110B_TypeB);
+  #elif defined(iS110_TYPEC)
+    Init_GS2200_SPI_type(iS110B_TypeC);
+  #else
+    #error "No valid device type defined. Please define iS110_TYPEA, iS110_TYPEB, or iS110_TYPEC."
+  #endif
 
   /* Initialize AT Command Library Buffer */
   gsparams.mode = ATCMD_MODE_STATION;
@@ -457,7 +489,7 @@ void GS2200wifiSetup(){
   WiFi_InitESCBuffer();
 
   // Start the loop to receive the data
-  strncpy(mqtt.params.topic, MQTT_TOPIC1 , sizeof(mqtt.params.topic));
+  strncpy(mqtt.params.topic, MQTT_TOPIC , sizeof(mqtt.params.topic));
   mqtt.params.QoS = 0;
   mqtt.params.retain = 0;
   if (true == theMqttGs2200.subscribe(&mqtt)) {
@@ -466,6 +498,42 @@ void GS2200wifiSetup(){
 
 
 }
+
+void checkMQTTtopic(){ 
+  String data;
+  /* just in case something from GS2200 */
+  while (gs2200.available()) {
+    if (false == theMqttGs2200.receive(data)) {
+      served = false; // quite the loop
+      break;
+    }
+
+    Serial.println("Recieve data: " + data);
+    if (data == "doInferrence"){
+      Serial.println("command do inferrence");
+      //startInferrence();
+    }
+
+    else if (data == "sendImage"){
+      Serial.println("command send Image");
+      camImagePost();
+    }
+
+    else if (data == "lockWheels"){
+      Serial.println("command lock wheels");
+      doLockWheels = true;
+      Serial.println("command locked");
+    }
+
+    else if (data == "unLockWheels"){
+      Serial.println("command unlock wheels");
+      doLockWheels = true;
+      Serial.println("command unlocked");
+    }
+
+  }
+}
+
 
 /* ---------------------------------------------------------------------
 * Setup Function
@@ -493,8 +561,8 @@ void setup() {
   }
 
   //Pin initialize
-  pinMode(ENB1, OUTPUT);
-  pinMode(ENB2, OUTPUT);
+  pinMode(IN2_LEFT, OUTPUT);
+  pinMode(IN2_RIGHT, OUTPUT);
 
 
   digitalWrite(LED0, LOW);         // turn the LED off (LOW is the voltage level)
@@ -527,19 +595,10 @@ void setup() {
     printError(err);
   }
 
-
-  /* Set parameters about still picture.
-   * In the following case, QUADVGA and JPEG.
-   */
-
   Serial.println("Set still picture format");
   err = theCamera.setStillPictureImageFormat(
-    //CAM_IMGSIZE_QUADVGA_H,      //1280
-    //CAM_IMGSIZE_QUADVGA_V,      //960
-    CAM_IMGSIZE_VGA_H,          //640
-    CAM_IMGSIZE_VGA_V,          //480
-    //CAM_IMGSIZE_QVGA_H,         //320
-    //CAM_IMGSIZE_QVGA_V,         //240
+    CAM_IMGSIZE_QVGA_H,         //320
+    CAM_IMGSIZE_QVGA_V,         //240
     CAM_IMAGE_PIX_FMT_JPG);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
@@ -548,9 +607,8 @@ void setup() {
   digitalWrite(LED0, HIGH);  // turn on LED
 
   //move_nnbFile();
-  //uploadNNB();
-  camImagePost();
-  //checkAnalogRead();
+  //camImagePost();
+  checkAnalogRead();
   //checkDrive();
 }
 
@@ -561,7 +619,6 @@ void loop() {
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("loop");
   checkMQTTtopic();
+  camImagePost();
 
-
-				
 }

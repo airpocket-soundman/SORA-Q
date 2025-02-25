@@ -840,8 +840,8 @@ void setup() {
 
   //SDカード接続時はnnbFile更新
   //move_nnbFile();
-  //File nnbfile = Flash.open(flashPath);
-  File nnbfile = theSD.open("model.nnb");
+  File nnbfile = Flash.open(flashPath);
+  //File nnbfile = theSD.open("model.nnb");
   int ret = dnnrt.begin(nnbfile);
   if (ret < 0) {
     Serial.println("dnnrt.begin failed" + String(ret));
