@@ -18,7 +18,7 @@
  Ver.0.6.1 自動走行追加
  */
 
-char version[] = "Ver.0.7.0";
+char version[] = "Ver.0.5.0";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -31,7 +31,7 @@ char version[] = "Ver.0.7.0";
 #include <Flash.h>
 #include <DNNRT.h>
 
-#define CONSOLE_BAUDRATE    115200
+#define CONSOLE_BAUDRATE    57600
 #define TOTAL_PICTURE_COUNT 1
 #define PICTURE_INTERVAL    1000
 #define FIRST_INTERVAL      3000
@@ -61,7 +61,7 @@ char version[] = "Ver.0.7.0";
 
 #define RGB565(r, g, b) (((r & 0x1F) << 11) | ((g & 0x3F) << 5) | (b & 0x1F))
 
-
+//DNNクラス関係設定
 float threshold = 0.2;
 
 DNNRT dnnrt;
@@ -123,17 +123,16 @@ ClipRectSet clipSet = {
     }
 };
 
+//通信用設定
 const uint16_t RECEIVE_PACKET_SIZE = 1500;
 uint8_t Receive_Data[RECEIVE_PACKET_SIZE] = { 0 };
-bool nnb_copy = true;
 
-//char nnbFile[] = "airpocket_newlogo.jpg";
+//dnn設定
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 char nnbFile[] = "model.nnb";
 bool doInferrence   = false;
-
-
+bool nnb_copy = true;
 
 // auto start on/off
 bool autoStart      = false;
@@ -153,8 +152,10 @@ bool photo_reflector_out    = false;
 bool photo_reflector_left   = false;
 bool photo_reflector_right  = false;
 
+//MQTTデータパース用変数
 String param1, param2, param3, param4, param5, param6;
 
+//WiFiモジュール関連
 TelitWiFi gs2200;
 TWIFI_Params gsparams;
 HttpGs2200 theHttpGs2200(&gs2200);
@@ -165,6 +166,7 @@ MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
 bool served = false;
 MQTTGS2200_Mqtt mqtt;
 
+//Flashメモリ内ファイルリスト化
 void listFiles(File dir) {
   if (!dir || !dir.isDirectory()) {
     Serial.println("Failed to open directory");
@@ -191,6 +193,7 @@ void listFiles(File dir) {
   }
 }
 
+//モータハンドラ
 void motor_handler(int left_speed, int right_speed){
   char buffer[30];  // 十分なサイズのバッファを用意
   snprintf(buffer, sizeof(buffer), "SET left: %3d, Right: %3d", left_speed, right_speed);
@@ -218,6 +221,7 @@ void motor_handler(int left_speed, int right_speed){
   }
 }
 
+//フォトリフレクタ読込
 void read_photo_reflector(){
   photo_reflector_left  = (analogRead(A2) >= PHOTO_REFLECTOR_THRETHOLD_LEFT);
   photo_reflector_right = (analogRead(A3) >= PHOTO_REFLECTOR_THRETHOLD_RIGHT);
@@ -229,13 +233,14 @@ void read_photo_reflector(){
   }
 }
 
+//車輪格納ロック
 void lockWheels(){
   Serial.println("lock wheels");
   motor_handler( -75,  -75);
   delay(300);
   motor_handler(   0,    0);
 }
-
+//車輪格納ロック解除
 void unlockWheels(){
   Serial.println("unlock wheels");
   motor_handler(  75,   75);
@@ -243,6 +248,7 @@ void unlockWheels(){
   motor_handler(   0,    0);
 }
 
+//モータ動作テスト
 void checkDrive(){
 
   if (driveTest){
@@ -295,6 +301,7 @@ void checkDrive(){
   }
 }
 
+//MQTT受信データパース
 void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
     int startIndex = 0;
     int commaIndex;
@@ -324,8 +331,8 @@ void splitString(String input, String &var1, String &var2, String &var3, String 
     }
 }
 
+//MQTT受信処理
 void checkMQTTtopic(){ 
-
   String data;
   /* just in case something from GS2200 */
   while (gs2200.available()) {
@@ -358,6 +365,7 @@ void checkMQTTtopic(){
   }
 }
 
+//フォトリフレクタ読み取りテスト
 void checkAnalogRead(){
   if (analogReadTest){
     int counter = 300;
@@ -443,6 +451,7 @@ void move_nnbFile() {
 
 }
 
+//http リクエストパース
 void parse_httpresponse(char *message) {
   char *p;
 
@@ -451,6 +460,7 @@ void parse_httpresponse(char *message) {
   }
 }
 
+//Cameraクラスエラー表示
 void printError(enum CamErr err) {
   Serial.print("Error: ");
   switch (err) {
@@ -489,6 +499,7 @@ void printError(enum CamErr err) {
   }
 }
 
+//http post
 bool custom_post(const char *url_path, const char *body, uint32_t size) {
   char size_string[10];
   snprintf(size_string, sizeof(size_string), "%d", size);
@@ -504,6 +515,7 @@ bool custom_post(const char *url_path, const char *body, uint32_t size) {
 
 }
 
+//イメージをpost
 void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
  
   Serial.print("imgBuffer is available: ");
@@ -563,58 +575,7 @@ void camImagePost(){
   imagePost = false;
 }
 
-void uploadNNB() {
-  if (nnbFilePost){
-    Serial.println("===== start NNB file post");
-    File file = Flash.open(flashPath, FILE_READ);
-    Serial.println("flash opened");
-    if (file){
-      // Calculate size in byte
-      uint32_t file_size = file.size();
-      Serial.println(file_size);
-      // Define_a body pointer having the continuous memory space with size `file_size`
-      char *body = (char *)malloc(file_size);  // +1 is null char
-      if (body == NULL) {
-        Serial.println("No free memory");
-      }
-      Serial.println("nnb read byte");
-      // Read byte of the file iteratively and put it in the address where each member of body pointer points out
-      int index = 0;
-      while (file.available()) {
-        body[index++] = file.read();
-      }
-      file.close();
-      Serial.println("nnb read finished");
-      // Send the body data to the server
-      bool result = custom_post(HTTP_POST_PATH, body, file_size);
-      if (false == result) {
-        Serial.println("Post Failed");
-      }
-      free(body);
-      Serial.println("custom_post finished");
-      result = false;
-      do {
-        result = theHttpGs2200.receive(5000);
-        if (result) {
-          theHttpGs2200.read_data(Receive_Data, RECEIVE_PACKET_SIZE);
-          ConsolePrintf("%s", (char *)(Receive_Data));
-        } else {
-          // AT+HTTPSEND command is done
-          Serial.println("\r\n");
-        }
-      } while (result);
-
-      result = theHttpGs2200.end();
-      Serial.println("NNBファイル送信完了======================= \n");
-    } else {
-      Serial.println("nnbファイルがありません \n");
-    }
-
-  } else {
-  Serial.println("==== nnb file post is skipped.\n");
-  }
-}
-
+//BB描画
 void drawBox(uint16_t* imgBuf, const ClipRect& clip) {
   /* Draw target line */
   for (int x = clip.x; x < clip.x+clip.width; ++x) {
@@ -631,6 +592,7 @@ void drawBox(uint16_t* imgBuf, const ClipRect& clip) {
   }  
 }
 
+//推論プリプロセス
 void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   // 画像をクロップしてリサイズ
 
@@ -708,6 +670,7 @@ void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   }
 }
 
+//イメージデータ情報確認
 void printPixInfomation(CamImage& img) {
     // ピクセルフォーマットを取得して文字列に変換
     int pixFormat = img.getPixFormat(); // 画像オブジェクトからピクセルフォーマットを取得
@@ -743,7 +706,7 @@ void printPixInfomation(CamImage& img) {
     Serial.println("====================");
 }
 
-/* wifi Setup */
+// wifiセットアップ 
 void GS2200wifiSetup(){
   /* initialize digital pin LED_BUILTIN as an output. */
   pinMode(LED0, OUTPUT);
@@ -848,6 +811,7 @@ void sendMqttMessage(const char* label, float probability, int targetArea, int m
   }
 }
 
+//カメラストリーミングコールバック
 void CamCB(CamImage img){
   //Serial.println("->CamCB Call back");
 
@@ -975,7 +939,7 @@ void CamCB(CamImage img){
   delay(2000);
 }
 
-// Setup Function 
+//セットアップ
 void setup() {
   /* Open serial communications and wait for port to open */
 
@@ -1058,7 +1022,6 @@ void setup() {
   digitalWrite(LED0, HIGH);  // turn on LED
 
   move_nnbFile();
-  //uploadNNB();
   checkAnalogRead();
   checkDrive();
 
@@ -1067,20 +1030,21 @@ void setup() {
     printError(err);
   }
 
-  //delay(20000);
+  delay(20000);
   lockWheels();
-  //delay(15000);
+  delay(15000);
   unlockWheels();
 
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
-  //delay(3000);
+  delay(3000);
   doInferrence = true;
 
 }
 
+//メインループ
 void loop() {
 
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
@@ -1091,6 +1055,8 @@ void loop() {
 
   if (autoSerch){
     
+    //sendMqttMessage(maxLabel.c_str(), maxOutput);
+
     if (imagePost == true){
       camImagePost();
     }

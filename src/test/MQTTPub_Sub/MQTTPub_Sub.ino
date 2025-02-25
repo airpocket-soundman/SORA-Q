@@ -20,7 +20,7 @@ void setup() {
     Serial.begin(CONSOLE_BAUDRATE);   // PCとのシリアル通信開始
 
     /* GS2200のSPIアクセスを初期化 */
-    Init_GS2200_SPI_type(iS110B_TypeA);
+    Init_GS2200_SPI_type(iS110B_TypeC);
 
     /* ATコマンドライブラリバッファを初期化 */
     gsparams.mode = ATCMD_MODE_STATION;

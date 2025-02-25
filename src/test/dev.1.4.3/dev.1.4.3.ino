@@ -13,16 +13,14 @@
 ✔ Ver.0.4.1 CamCBの中でinferrenceする
 ✔ Ver.0.4.2 inferrenceの有無をスイッチングする
 ✔ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
-✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
-✔ Ver.0.6.0 SLIM探索
- Ver.0.6.1 自動走行追加
+✔ Ver.1.4.3 Ver.0.4.3からコピー フラッシュメモリ書き込めない
  */
 
-char version[] = "Ver.0.7.0";
+char version[] = "Ver.1.4.3";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
-#include <MqttGs2200.h>
+#include "MqttGs2200_.h"
 #include <SDHCI.h>
 #include <TelitWiFi.h>
 #include <stdio.h> /* for sprintf */
@@ -31,7 +29,7 @@ char version[] = "Ver.0.7.0";
 #include <Flash.h>
 #include <DNNRT.h>
 
-#define CONSOLE_BAUDRATE    115200
+#define CONSOLE_BAUDRATE    57600
 #define TOTAL_PICTURE_COUNT 1
 #define PICTURE_INTERVAL    1000
 #define FIRST_INTERVAL      3000
@@ -139,14 +137,10 @@ bool doInferrence   = false;
 bool autoStart      = false;
 
 // test mode on/off
-bool nnbFilePost       = false;    //NNBファイルをhttp postしてチェック
-bool analogReadTest    = false;
-bool driveTest         = false;
-bool selectedImageOnly = true;
-bool imagePost         = false;
-bool detectedSLIM      = false;
-bool autoSerch         = true;    //SLIM探索を行う
-bool waitInferrence    = true;    //推論を待つ
+bool imgPostTest    = true;    //イメージ撮影とhttp post requestのテスト
+bool nnbFilePost    = false;    //NNBファイルをhttp postしてチェック
+bool analogReadTest = false;
+bool driveTest      = false;
 
 // out put mode on/off
 bool photo_reflector_out    = false;
@@ -191,6 +185,7 @@ void listFiles(File dir) {
   }
 }
 
+
 void motor_handler(int left_speed, int right_speed){
   char buffer[30];  // 十分なサイズのバッファを用意
   snprintf(buffer, sizeof(buffer), "SET left: %3d, Right: %3d", left_speed, right_speed);
@@ -209,10 +204,10 @@ void motor_handler(int left_speed, int right_speed){
   if (right_speed == 0){
     digitalWrite(IN1_RIGHT, LOW);
     digitalWrite(IN2_RIGHT, LOW);
-  } else if (right_speed > 0) {
+  } else if (left_speed > 0) {
     analogWrite(IN1_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
     digitalWrite(IN2_RIGHT, LOW);
-  } else if (right_speed < 0) {
+  } else if (left_speed < 0) {
     analogWrite(IN2_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
     digitalWrite(IN1_RIGHT, LOW);
   }
@@ -239,7 +234,7 @@ void lockWheels(){
 void unlockWheels(){
   Serial.println("unlock wheels");
   motor_handler(  75,   75);
-  delay(400);
+  delay(300);
   motor_handler(   0,    0);
 }
 
@@ -325,7 +320,6 @@ void splitString(String input, String &var1, String &var2, String &var3, String 
 }
 
 void checkMQTTtopic(){ 
-
   String data;
   /* just in case something from GS2200 */
   while (gs2200.available()) {
@@ -350,10 +344,6 @@ void checkMQTTtopic(){
       lockWheels();
     } else if (param1 == "unlockWheels") {
       unlockWheels();
-    } else if (param1 == "autoON"){
-      autoSerch = true;
-    } else if (param1 == "autoOFF"){
-      autoSerch = false;
     }
   }
 }
@@ -379,67 +369,48 @@ void checkAnalogRead(){
   }
 }
 
-//microSDに model.nnb が存在するとき、推論用モデルをflashメモリにコピーする
-void move_nnbFile() {
-  Serial.println("\n////////////////// nnb file /////////////////");
+void move_nnbFile(){
 
-  if (nnb_copy) {
-    File readFile = theSD.open(nnbFile, FILE_READ);
+  Serial.println("\n////////////////// nnb file /////////////////");
+  if (nnb_copy){
+    File readFile = theSD.open(nnbFile, FILE_READ);//flashPath
     uint32_t file_size = readFile.size();
     Serial.print("SD data file size = ");
     Serial.println(file_size);
-    char *body = (char *)malloc(file_size);
-
+    char *body = (char *)malloc(file_size);  // +1 is null char
     if (body == NULL) {
-      Serial.println("メモリ確保に失敗しました");
-      return;
+      Serial.println("No free memory");
     }
-
     int index = 0;
     while (readFile.available()) {
       body[index++] = readFile.read();
     }
     readFile.close();
-
+    //Flash.format();
     Flash.mkdir(flashFolder);
 
     if (Flash.exists(flashPath)) {
       Flash.remove(flashPath);  // ファイルを削除
     }
-
+    
     File writeFile = Flash.open(flashPath, FILE_WRITE);
     if (writeFile) {
-      Serial.println("nnb fileをフラッシュメモリに書き込み中...");
+      Serial.println("nnb fileをフラッシュメモリ に書き込み中...");
 
-      size_t written = writeFile.write((uint8_t*)body, file_size);
-      if (written != file_size) {
-        Serial.println("ファイルの書き込みに失敗しました");
-      } else {
-        Serial.println("nnb fileをフラッシュメモリへ書き込み完了");
-      }
+      // body のデータをフラッシュメモリに書き込む
+      writeFile.write((uint8_t*)body, file_size);
 
-      writeFile.close();
-
-      // フラッシュメモリに保存されたファイルのサイズを表示
-      File flashFile = Flash.open(flashPath, FILE_READ);
-      if (flashFile) {
-        uint32_t flashFileSize = flashFile.size();
-        Serial.print("フラッシュメモリのファイルサイズ = ");
-        Serial.println(flashFileSize);
-        flashFile.close();
-      } else {
-        Serial.println("フラッシュメモリのファイルオープンに失敗しました");
-      }
+      writeFile.close(); // ファイルを閉じる
+      Serial.println("nnb fileをフラッシュメモリへ書き込み完了");
     } else {
+      // ファイルのオープンに失敗した場合
       Serial.println("フラッシュメモリのファイルオープンに失敗しました");
     }
-
     free(body);
   } else {
     Serial.println("move nnb file passed.\n");
   }
-
-  Serial.println("\n////////////////// nnb file end //////////////////////");
+  Serial.println("\n////////////////// nnb file end \\\\\\\\\\\\\\\\\\");
 
 }
 
@@ -534,102 +505,31 @@ void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
 
 /* カメラ撮影とhttp request postのテスト*/
 void camImagePost(){
+  if (imgPostTest){
+    Serial.println("==== start Camera Image Post Test");
+    int take_picture_count = 0;
+    while (take_picture_count < TOTAL_PICTURE_COUNT) {
+      Serial.println("call takePicture()");
+      CamImage img = theCamera.takePicture();
+      Serial.println("======image info =========== @ cam Image post");
+      //printPixInfomation(img);
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"image\":\"%s\"}", "image sending.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
-
-  Serial.println("==== start Camera Image Post Test");
-  int take_picture_count = 0;
-  while (take_picture_count < TOTAL_PICTURE_COUNT) {
-    Serial.println("call takePicture()");
-    CamImage img = theCamera.takePicture();
-    Serial.println("======image info =========== @ cam Image post");
-    //printPixInfomation(img);
-
-    if (img.isAvailable()) {
-      uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
-      size_t imageSize = img.getImgSize();
-      uploadImage(imgBuffer, imageSize);
-    } else {
-      Serial.println("Failed to take picture");
+      if (img.isAvailable()) {
+        uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
+        size_t imageSize = img.getImgSize();
+        uploadImage(imgBuffer, imageSize);
+      } else {
+        Serial.println("Failed to take picture");
+      }
+    take_picture_count++;
     }
-  take_picture_count++;
-  }
-  //theCamera.end();
-  Serial.println("==== cam Image Post test is finished.\n");
-
-  imagePost = false;
-}
-
-void uploadNNB() {
-  if (nnbFilePost){
-    Serial.println("===== start NNB file post");
-    File file = Flash.open(flashPath, FILE_READ);
-    Serial.println("flash opened");
-    if (file){
-      // Calculate size in byte
-      uint32_t file_size = file.size();
-      Serial.println(file_size);
-      // Define_a body pointer having the continuous memory space with size `file_size`
-      char *body = (char *)malloc(file_size);  // +1 is null char
-      if (body == NULL) {
-        Serial.println("No free memory");
-      }
-      Serial.println("nnb read byte");
-      // Read byte of the file iteratively and put it in the address where each member of body pointer points out
-      int index = 0;
-      while (file.available()) {
-        body[index++] = file.read();
-      }
-      file.close();
-      Serial.println("nnb read finished");
-      // Send the body data to the server
-      bool result = custom_post(HTTP_POST_PATH, body, file_size);
-      if (false == result) {
-        Serial.println("Post Failed");
-      }
-      free(body);
-      Serial.println("custom_post finished");
-      result = false;
-      do {
-        result = theHttpGs2200.receive(5000);
-        if (result) {
-          theHttpGs2200.read_data(Receive_Data, RECEIVE_PACKET_SIZE);
-          ConsolePrintf("%s", (char *)(Receive_Data));
-        } else {
-          // AT+HTTPSEND command is done
-          Serial.println("\r\n");
-        }
-      } while (result);
-
-      result = theHttpGs2200.end();
-      Serial.println("NNBファイル送信完了======================= \n");
-    } else {
-      Serial.println("nnbファイルがありません \n");
-    }
-
+    //theCamera.end();
+    Serial.println("==== cam Image Post test is finished.\n");
   } else {
-  Serial.println("==== nnb file post is skipped.\n");
+    Serial.println("==== cam Image Post test was passed.\n");
   }
 }
 
-void drawBox(uint16_t* imgBuf, const ClipRect& clip) {
-  /* Draw target line */
-  for (int x = clip.x; x < clip.x+clip.width; ++x) {
-    for (int n = 0; n < LINE_THICKNESS; ++n) {
-      *(imgBuf + CAM_IMG_W*(clip.y+n) + x)               = RGB565(31, 0, 0);
-      *(imgBuf + CAM_IMG_W*(clip.y+clip.height-1-n) + x) = RGB565(31, 0, 0);
-    }
-  }
-  for (int y = clip.y; y < clip.y+clip.height; ++y) {
-    for (int n = 0; n < LINE_THICKNESS; ++n) {
-      *(imgBuf + CAM_IMG_W*y + clip.x+n)                = RGB565(31, 0, 0);
-      *(imgBuf + CAM_IMG_W*y + clip.x + clip.width-1-n) = RGB565(31, 0, 0);
-    }
-  }  
-}
 
 void preprocessImage(CamImage& img, DNNVariable& input, const ClipRect& clip) {
   // 画像をクロップしてリサイズ
@@ -816,52 +716,25 @@ void GS2200wifiSetup(){
 }
 
 // MQTTメッセージ送信
-void sendMqttMessage(const char* label, float probability, int targetArea, int maxIndex) {
-  if (maxIndex == 24){
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "not detected.");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-  }
-  else {
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "Detected SLIM!!");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    // targetArea用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"area\":\"%d\"}", targetArea);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
+void sendMqttMessage(const char* label, float probability) {
+  // label用メッセージの準備
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"label\":\"%s\"}", label);
+  printf("Sending JSON: %s\n", mqtt.params.message);
+  mqtt.params.len = strlen(mqtt.params.message);
+  theMqttGs2200.publish(&mqtt);
 
-    // label用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"label\":\"%s\"}", label);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-
-    // probability用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"probability\":%f}", probability);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-  }
+  // probability用メッセージの準備
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"probability\":%f}", probability);
+  printf("Sending JSON: %s\n", mqtt.params.message);
+  mqtt.params.len = strlen(mqtt.params.message);
+  theMqttGs2200.publish(&mqtt);
 }
 
 void CamCB(CamImage img){
   //Serial.println("->CamCB Call back");
-
   if (!doInferrence) {
     return;
   }
-  
-  waitInferrence = true;
-
-  
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Taking photos.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
 
   Serial.println("\nCamCB Start ++++++++++++++++++ <<@CamCB>>");
   //printPixInfomation(img);
@@ -878,12 +751,9 @@ void CamCB(CamImage img){
     return;
   }
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Inference");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  
   for (int i = 0; i < 17; i++) {
-    //delay(1000);
+    delay(1000);
 
 
     preprocessImage(img, input, clipSet.clips[i]);
@@ -958,21 +828,9 @@ void CamCB(CamImage img){
   Serial.println(" prbability:" + String(maxOutput));
   Serial.println("****=================");
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
+  sendMqttMessage(maxLabel.c_str(), maxOutput);
 
-
-  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
-
-  if (selectedImageOnly){
-    if (maxIndex != 24){
-      imagePost = true;
-    }
-  }
-  else {
-    imagePost = false;
-  }
   doInferrence = false;
-  waitInferrence = false;
-  delay(2000);
 }
 
 // Setup Function 
@@ -1009,8 +867,8 @@ void setup() {
 
   //SDカード接続時はnnbFile更新
   move_nnbFile();
-  File nnbfile = Flash.open(flashPath);
-  //File nnbfile = theSD.open("model.nnb");
+  //File nnbfile = Flash.open(flashPath);
+  File nnbfile = theSD.open("model.nnb");
   int ret = dnnrt.begin(nnbfile);
   if (ret < 0) {
     Serial.println("dnnrt.begin failed" + String(ret));
@@ -1057,62 +915,34 @@ void setup() {
 
   digitalWrite(LED0, HIGH);  // turn on LED
 
-  move_nnbFile();
-  //uploadNNB();
-  checkAnalogRead();
-  checkDrive();
+  if (autoStart){
+    delay(START_TIMER);
+    unlockWheels();
+    Serial.println("Begin Automatic Serch");
+  }
 
   err = theCamera.startStreaming(true, CamCB);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
-
-  //delay(20000);
-  lockWheels();
-  //delay(15000);
-  unlockWheels();
-
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
-  //delay(3000);
-  doInferrence = true;
-
 }
 
 void loop() {
-
   delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("");
   Serial.println("loop");
   Serial.println("");
+
+  doInferrence = true;
+  //sendMqttMessage(maxLabel.c_str(), maxOutput);
+
+  camImagePost();
+  delay(3000);
+
+  Serial.println(maxLabel);
+  Serial.println(maxOutput);
+
   checkMQTTtopic();
 
-  if (autoSerch){
-    
-    if (imagePost == true){
-      camImagePost();
-    }
-    Serial.println(maxLabel);
-    Serial.println(maxOutput);
-
-    
-
-    if (!detectedSLIM && !waitInferrence ){
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Moving");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    motor_handler(   25,   50);
-    delay(1000);
-    motor_handler(   0,    0);
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Movement ended.");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    doInferrence = true;
-    }
-  }
   //read_photo_reflector();
 }

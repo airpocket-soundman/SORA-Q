@@ -18,7 +18,7 @@
  Ver.0.6.1 自動走行追加
  */
 
-char version[] = "Ver.0.7.0";
+char version[] = "Ver.0.5.0";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -31,7 +31,7 @@ char version[] = "Ver.0.7.0";
 #include <Flash.h>
 #include <DNNRT.h>
 
-#define CONSOLE_BAUDRATE    115200
+#define CONSOLE_BAUDRATE    57600
 #define TOTAL_PICTURE_COUNT 1
 #define PICTURE_INTERVAL    1000
 #define FIRST_INTERVAL      3000
@@ -1067,16 +1067,16 @@ void setup() {
     printError(err);
   }
 
-  //delay(20000);
+  delay(20000);
   lockWheels();
-  //delay(15000);
+  delay(15000);
   unlockWheels();
 
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
-  //delay(3000);
+  delay(3000);
   doInferrence = true;
 
 }
@@ -1091,6 +1091,8 @@ void loop() {
 
   if (autoSerch){
     
+    //sendMqttMessage(maxLabel.c_str(), maxOutput);
+
     if (imagePost == true){
       camImagePost();
     }

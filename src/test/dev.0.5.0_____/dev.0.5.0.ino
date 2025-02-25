@@ -14,15 +14,15 @@
 ✔ Ver.0.4.2 inferrenceの有無をスイッチングする
 ✔ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
 ✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
-✔ Ver.0.6.0 SLIM探索
+ Ver.0.6.0 ラジコン走行
  Ver.0.6.1 自動走行追加
  */
 
-char version[] = "Ver.0.7.0";
+char version[] = "Ver.0.4.1";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
-#include <MqttGs2200.h>
+#include "MqttGs2200_.h"
 #include <SDHCI.h>
 #include <TelitWiFi.h>
 #include <stdio.h> /* for sprintf */
@@ -31,7 +31,7 @@ char version[] = "Ver.0.7.0";
 #include <Flash.h>
 #include <DNNRT.h>
 
-#define CONSOLE_BAUDRATE    115200
+#define CONSOLE_BAUDRATE    57600
 #define TOTAL_PICTURE_COUNT 1
 #define PICTURE_INTERVAL    1000
 #define FIRST_INTERVAL      3000
@@ -145,8 +145,7 @@ bool driveTest         = false;
 bool selectedImageOnly = true;
 bool imagePost         = false;
 bool detectedSLIM      = false;
-bool autoSerch         = true;    //SLIM探索を行う
-bool waitInferrence    = true;    //推論を待つ
+bool autoSerch         = true;
 
 // out put mode on/off
 bool photo_reflector_out    = false;
@@ -191,6 +190,7 @@ void listFiles(File dir) {
   }
 }
 
+
 void motor_handler(int left_speed, int right_speed){
   char buffer[30];  // 十分なサイズのバッファを用意
   snprintf(buffer, sizeof(buffer), "SET left: %3d, Right: %3d", left_speed, right_speed);
@@ -209,10 +209,10 @@ void motor_handler(int left_speed, int right_speed){
   if (right_speed == 0){
     digitalWrite(IN1_RIGHT, LOW);
     digitalWrite(IN2_RIGHT, LOW);
-  } else if (right_speed > 0) {
+  } else if (left_speed > 0) {
     analogWrite(IN1_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
     digitalWrite(IN2_RIGHT, LOW);
-  } else if (right_speed < 0) {
+  } else if (left_speed < 0) {
     analogWrite(IN2_RIGHT,   map(abs(right_speed),  0, 100, 0, 255));
     digitalWrite(IN1_RIGHT, LOW);
   }
@@ -239,7 +239,7 @@ void lockWheels(){
 void unlockWheels(){
   Serial.println("unlock wheels");
   motor_handler(  75,   75);
-  delay(400);
+  delay(300);
   motor_handler(   0,    0);
 }
 
@@ -439,7 +439,7 @@ void move_nnbFile() {
     Serial.println("move nnb file passed.\n");
   }
 
-  Serial.println("\n////////////////// nnb file end //////////////////////");
+Serial.println("\n////////////////// nnb file end //////////////////////");
 
 }
 
@@ -813,11 +813,16 @@ void GS2200wifiSetup(){
   strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
   mqtt.params.QoS = 0;
   mqtt.params.retain = 0;
+
+  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
+  printf("Sending JSON: %s\n", mqtt.params.message);
+  mqtt.params.len = strlen(mqtt.params.message);
+  theMqttGs2200.publish(&mqtt);
 }
 
 // MQTTメッセージ送信
-void sendMqttMessage(const char* label, float probability, int targetArea, int maxIndex) {
-  if (maxIndex == 24){
+void sendMqttMessage(const char* label, float probability, int targetArea) {
+  if (label == 24){
     snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "not detected.");
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
@@ -854,10 +859,6 @@ void CamCB(CamImage img){
   if (!doInferrence) {
     return;
   }
-  
-  waitInferrence = true;
-
-  
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Taking photos.");
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
@@ -883,7 +884,7 @@ void CamCB(CamImage img){
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
   for (int i = 0; i < 17; i++) {
-    //delay(1000);
+    delay(1000);
 
 
     preprocessImage(img, input, clipSet.clips[i]);
@@ -960,7 +961,7 @@ void CamCB(CamImage img){
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
 
 
-  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
+  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea);
 
   if (selectedImageOnly){
     if (maxIndex != 24){
@@ -968,11 +969,10 @@ void CamCB(CamImage img){
     }
   }
   else {
-    imagePost = false;
+    imagePost = true;
   }
   doInferrence = false;
-  waitInferrence = false;
-  delay(2000);
+
 }
 
 // Setup Function 
@@ -1008,7 +1008,7 @@ void setup() {
   listFiles(root);
 
   //SDカード接続時はnnbFile更新
-  move_nnbFile();
+  //move_nnbFile();
   File nnbfile = Flash.open(flashPath);
   //File nnbfile = theSD.open("model.nnb");
   int ret = dnnrt.begin(nnbfile);
@@ -1062,23 +1062,16 @@ void setup() {
   checkAnalogRead();
   checkDrive();
 
+  if (autoStart){
+    delay(START_TIMER);
+    unlockWheels();
+    Serial.println("Begin Automatic Serch");
+  }
+
   err = theCamera.startStreaming(true, CamCB);
   if (err != CAM_ERR_SUCCESS) {
     printError(err);
   }
-
-  //delay(20000);
-  lockWheels();
-  //delay(15000);
-  unlockWheels();
-
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
-  //delay(3000);
-  doInferrence = true;
-
 }
 
 void loop() {
@@ -1090,7 +1083,9 @@ void loop() {
   checkMQTTtopic();
 
   if (autoSerch){
-    
+    doInferrence = true;
+    //sendMqttMessage(maxLabel.c_str(), maxOutput);
+
     if (imagePost == true){
       camImagePost();
     }
@@ -1099,19 +1094,18 @@ void loop() {
 
     
 
-    if (!detectedSLIM && !waitInferrence ){
+    if (!detectedSLIM){
     snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Moving");
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
     theMqttGs2200.publish(&mqtt);
-    motor_handler(   25,   50);
-    delay(1000);
-    motor_handler(   0,    0);
+
+    delay(5000);
+
     snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Movement ended.");
     printf("Sending JSON: %s\n", mqtt.params.message);
     mqtt.params.len = strlen(mqtt.params.message);
     theMqttGs2200.publish(&mqtt);
-    doInferrence = true;
     }
   }
   //read_photo_reflector();

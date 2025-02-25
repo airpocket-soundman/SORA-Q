@@ -802,12 +802,12 @@ void GS2200wifiSetup(){
   WiFi_InitESCBuffer();
 
   // Start the loop to receive the data
-  strncpy(mqtt.params.topic, MQTT_TOPIC1 , sizeof(mqtt.params.topic));
-  mqtt.params.QoS = 0;
-  mqtt.params.retain = 0;
-  if (true == theMqttGs2200.subscribe(&mqtt)) {
-    ConsolePrintf( "Subscribed! \n" );
-  }
+  //strncpy(mqtt.params.topic, MQTT_TOPIC1 , sizeof(mqtt.params.topic));
+  //mqtt.params.QoS = 0;
+  //mqtt.params.retain = 0;
+  //if (true == theMqttGs2200.subscribe(&mqtt)) {
+  //  ConsolePrintf( "Subscribed! \n" );
+  //}
 
   strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
   mqtt.params.QoS = 0;
@@ -1075,18 +1075,18 @@ void setup() {
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
-  delay(3000);
+  //delay(3000);
   doInferrence = true;
 
 }
 
 void loop() {
 
-  delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
+  //delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("");
   Serial.println("loop");
   Serial.println("");
-  checkMQTTtopic();
+  //checkMQTTtopic();
 
   if (autoSerch){
     

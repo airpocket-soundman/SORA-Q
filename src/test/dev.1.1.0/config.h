@@ -20,7 +20,9 @@
 /*-------------------------------------------------------------------------*
  * Configration
  *-------------------------------------------------------------------------*/
-//#define HOME //HOME, HOME3A. WORK, WORK3A or NOTE3A
+// is110のRev設定
+#define iS110_TYPEC   //is110_TYPEA, is110_TYPEB, is110_TYPEC, 
+
 
 #define WORK //HOME, HOME3A. WORK, WORK3A or NOTE3A
 
@@ -68,9 +70,11 @@
 #define  HTTP_PORT      "1880"
 #define  HTTP_GET_PATH  "/getdata"
 #define  HTTP_POST_PATH "/postdata"
+#define  HTTP_POST_TEXT_PATH "/posttxt"
 
-#define  MQTT_PORT     "1883"
-#define  MQTT_CLI_ID   "Telit_Device_pub"
-#define  MQTT_TOPIC1   "fromNodeRed"
+#define  MQTT_PORT      "1883"
+#define  MQTT_CLI_ID    "Telit_Device_pub"
+#define  MQTT_TOPIC     "fromNodeRed"
 
 #endif /*_CONFIG_H_*/
+bool nnb_copy = true;

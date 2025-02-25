@@ -24,7 +24,7 @@
 #define iS110_TYPEA   //is110_TYPEA, is110_TYPEB, is110_TYPEC, 
 
 
-#define NOTE //HOME, HOME3A. WORK, WORK3A or NOTE3A
+#define WORK //HOME, HOME3A. WORK, WORK3A or NOTE3A
 
 #ifdef HOME
 #define  AP_SSID        "kumakero2.4"

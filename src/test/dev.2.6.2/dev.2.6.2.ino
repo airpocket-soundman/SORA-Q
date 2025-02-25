@@ -16,9 +16,10 @@
 ✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
 ✔ Ver.0.6.0 SLIM探索
  Ver.0.6.1 自動走行追加
+ Ver.2.6.2 トラ技陽
  */
 
-char version[] = "Ver.0.7.0";
+char version[] = "Ver.2.6.2";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
@@ -36,7 +37,7 @@ char version[] = "Ver.0.7.0";
 #define PICTURE_INTERVAL    1000
 #define FIRST_INTERVAL      3000
 #define SUBSCRIBE_TIMEOUT   60000	//ms
-#define START_TIMER         10000 //ms
+#define START_TIMER         1000 //ms
 
 #define AIN1        A2       //左車輪エンコーダ
 #define AIN2        A3       //右車輪エンコーダ
@@ -810,10 +811,64 @@ void GS2200wifiSetup(){
     ConsolePrintf( "Subscribed! \n" );
   }
 
-  strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
-  mqtt.params.QoS = 0;
-  mqtt.params.retain = 0;
+  //strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
+  //mqtt.params.QoS = 0;
+  //mqtt.params.retain = 0;
 }
+
+bool uploadString(const String &body) {
+  // 送信するデータを格納するバッファ
+  char sendData[100];
+  
+  // Stringからchar配列にコピー（bodyの長さが100を超えない前提で）
+  body.toCharArray(sendData, sizeof(sendData));  // 文字列をsendDataにコピー
+
+  size_t size = strlen(sendData);  // 送信する文字列の長さを取得
+
+  // custom_post関数を呼び出してPOSTリクエストを送信
+  bool result = custom_post(HTTP_POST_TEXT_PATH, (const uint8_t*)sendData, size);
+  if (false == result) {
+    Serial.println("Post Failed");
+    return false;
+  }
+
+  // 受信処理
+  result = false;
+  do {
+    result = theHttpGs2200.receive(5000);  // タイムアウトは5000ms
+    if (result) {
+      theHttpGs2200.read_data(Receive_Data, RECEIVE_PACKET_SIZE);
+      ConsolePrintf("%s", (char *)(Receive_Data));  // 受信データを表示
+    } else {
+      Serial.println("\r\nNo response from server");
+    }
+  } while (result);
+
+  // 終了処理
+  theHttpGs2200.end();
+  return true;
+}
+
+void sendResult(const char* label, float probability, int targetArea, int maxIndex) {
+  String messageStr;
+  if (maxIndex == 24){
+    messageStr = "{\"result\":\"" + String("not detected.") + "\"}";
+    uploadString(messageStr);
+    Serial.println(messageStr);
+  }
+  else {
+    String messageStr = "{";
+    messageStr += "\"result\":\"Detected SLIM!!\",";
+    messageStr += "\"area\":\"" + String(targetArea) + "\",";
+    messageStr += "\"label\":\"" + String(label) + "\",";
+    messageStr += "\"probability\":" + String(probability, 6);
+    messageStr += "}";
+
+    uploadString(messageStr);
+    Serial.println(messageStr);
+  }
+}
+
 
 // MQTTメッセージ送信
 void sendMqttMessage(const char* label, float probability, int targetArea, int maxIndex) {
@@ -960,7 +1015,7 @@ void CamCB(CamImage img){
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
 
 
-  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
+  sendResult(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
 
   if (selectedImageOnly){
     if (maxIndex != 24){
@@ -1057,10 +1112,10 @@ void setup() {
 
   digitalWrite(LED0, HIGH);  // turn on LED
 
-  move_nnbFile();
+  //move_nnbFile();
   //uploadNNB();
-  checkAnalogRead();
-  checkDrive();
+  //checkAnalogRead();
+  //checkDrive();
 
   err = theCamera.startStreaming(true, CamCB);
   if (err != CAM_ERR_SUCCESS) {
@@ -1072,11 +1127,12 @@ void setup() {
   //delay(15000);
   unlockWheels();
 
+  Serial.println("SLIM ready");
   snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
   printf("Sending JSON: %s\n", mqtt.params.message);
   mqtt.params.len = strlen(mqtt.params.message);
   theMqttGs2200.publish(&mqtt);
-  //delay(3000);
+  delay(3000);
   doInferrence = true;
 
 }
@@ -1091,6 +1147,8 @@ void loop() {
 
   if (autoSerch){
     
+    //sendMqttMessage(maxLabel.c_str(), maxOutput);
+
     if (imagePost == true){
       camImagePost();
     }
