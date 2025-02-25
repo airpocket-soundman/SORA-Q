@@ -10,19 +10,19 @@
 ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
 ✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
 ✔ Ver.0.4.0 roop内から定期的に画像送信
-✔ Ver.0.4.1 CamCBの中でinferrenceする
-✔ Ver.0.4.2 inferrenceの有無をスイッチングする
-✔ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
+✔ Ver.0.4.1 CamCBの中でinferenceする
+✔ Ver.0.4.2 inferenceの有無をスイッチングする
+✔ Ver.0.4.3 inferenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
 ✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
  Ver.0.6.0 ラジコン走行
  Ver.0.6.1 自動走行追加
+ toragi_V.1.1.1 MQTT廃止
  */
 
 char version[] = "toragi_Ver.1.0.0";
 
 #include <GS2200Hal.h>
 #include <HttpGs2200.h>
-#include <MqttGs2200.h>
 #include <SDHCI.h>
 #include <TelitWiFi.h>
 #include <stdio.h> /* for sprintf */
@@ -31,12 +31,9 @@ char version[] = "toragi_Ver.1.0.0";
 #include <Flash.h>
 #include <DNNRT.h>
 
-#define CONSOLE_BAUDRATE    57600
-#define TOTAL_PICTURE_COUNT 1
-#define PICTURE_INTERVAL    1000
-#define FIRST_INTERVAL      3000
+#define CONSOLE_BAUDRATE    115200
 #define SUBSCRIBE_TIMEOUT   60000	//ms
-#define START_TIMER         10000 //ms
+#define LOOP_INTERVAL       1000  //ms
 
 #define AIN1        A2       //左車輪エンコーダ
 #define AIN2        A3       //右車輪エンコーダ
@@ -88,6 +85,7 @@ static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_
                                 "Top_R0",     "Top_R1",     "Top_R2",     "Top_R3",
                                 "empty"};
 
+
 //画像クロップ領域指定
 struct ClipRect {
     int x;
@@ -131,7 +129,7 @@ bool nnb_copy = true;
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 char nnbFile[] = "model.nnb";
-bool doInferrence   = false;
+bool doInference   = false;
 
 
 
@@ -145,25 +143,25 @@ bool driveTest         = false;
 bool selectedImageOnly = true;
 bool imagePost         = false;
 bool detectedSLIM      = false;
-bool autoSerch         = true;    //SLIM探索を行う
-bool waitInferrence    = true;    //推論を待つ
+bool autoSerch         = false;    //SLIM探索を行う
+bool waitInference     = false;    //推論を待つ
 
 // out put mode on/off
 bool photo_reflector_out    = false;
 bool photo_reflector_left   = false;
 bool photo_reflector_right  = false;
 
-String param1, param2, param3, param4, param5, param6;
+bool doLockWheels           = false;
+bool doUnLockWheels         = false;
+
 
 TelitWiFi gs2200;
 TWIFI_Params gsparams;
 HttpGs2200 theHttpGs2200(&gs2200);
 HTTPGS2200_HostParams httpHostParams; // HTTPサーバ接続用のホストパラメータ
 SDClass theSD;
-MqttGs2200 theMqttGs2200(&gs2200);
-MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
-bool served = false;
-MQTTGS2200_Mqtt mqtt;
+String messageStr;
+
 
 void listFiles(File dir) {
   if (!dir || !dir.isDirectory()) {
@@ -232,15 +230,15 @@ void read_photo_reflector(){
 
 void lockWheels(){
   Serial.println("lock wheels");
-  motor_handler( -75,  -75);
-  delay(300);
+  motor_handler( -10,  -10);
+  delay(100);
   motor_handler(   0,    0);
 }
 
-void unlockWheels(){
+void unLockWheels(){
   Serial.println("unlock wheels");
-  motor_handler(  75,   75);
-  delay(300);
+  motor_handler(  10,   10);
+  delay(100);
   motor_handler(   0,    0);
 }
 
@@ -293,69 +291,6 @@ void checkDrive(){
     Serial.println("==== drive test is finished.\n");
   } else {
     Serial.println("==== drive test was skipped.\n");
-  }
-}
-
-void splitString(String input, String &var1, String &var2, String &var3, String &var4, String &var5, String &var6) {
-    int startIndex = 0;
-    int commaIndex;
-    int varCount = 0;
-
-    while ((commaIndex = input.indexOf(',', startIndex)) != -1 && varCount < 5) {
-        if (varCount == 0) {
-            var1 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 1) {
-            var2 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 2) {
-            var3 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 3) {
-            var4 = input.substring(startIndex, commaIndex);
-        } else if (varCount == 4) {
-            var5 = input.substring(startIndex, commaIndex);
-        }
-        startIndex = commaIndex + 1;
-        varCount++;
-    }
-    
-    // 最後の変数に残りの部分を格納
-    if (varCount < 6) {
-        var6 = input.substring(startIndex);
-    } else {
-        var6 = ""; // 余った部分がない場合
-    }
-}
-
-void checkMQTTtopic(){ 
-
-  String data;
-  /* just in case something from GS2200 */
-  while (gs2200.available()) {
-    if (false == theMqttGs2200.receive(data)) {
-      served = false; // quite the loop
-      break;
-    }
-
-    Serial.println("Recieve data: " + data);
-    
-    // dataをパース
-    splitString(data, param1, param2, param3, param4, param5, param6);
-    
-    Serial.println("param 1: " + param1);
-    Serial.println("param 2: " + param2);
-    Serial.println("param 3: " + param3);
-    Serial.println("param 4: " + param4);
-    Serial.println("param 5: " + param5);
-    Serial.println("param 6: " + param6);
-    // param1の値によってlockwheelsまたはunlockWheelsを実行
-    if (param1 == "lockWheels") {
-      lockWheels();
-    } else if (param1 == "unlockWheels") {
-      unlockWheels();
-    } else if (param1 == "autoON"){
-      autoSerch = true;
-    } else if (param1 == "autoOFF"){
-      autoSerch = false;
-    }
   }
 }
 
@@ -535,29 +470,36 @@ bool uploadString(const String &body) {
       // 受信データを String に変換
       responseStr = String((char*)Receive_Data);
 
-      // 💡 受信データのデバッグ表示
+      // 受信データのデバッグ表示
       Serial.println("Raw Received Data:");
       Serial.println(responseStr);
 
-      // 💡 決め打ちで最初の n 文字を削除 (例えば 13 文字)
+      // 決め打ちで最初の n 文字を削除 (例えば 13 文字)
       int fixedOffset = 8;  // 削除する文字数（適宜調整）
       if (responseStr.length() > fixedOffset) {
           responseStr = responseStr.substring(fixedOffset);  // 先頭の fixedOffset 文字を削除
       } else {
           Serial.println("Warning: Response too short to trim");
       }
-
-      // 💡 余分な改行やスペースを除去
+      // 余分な改行やスペースを除去
       responseStr.trim();
 
       Serial.println("Processed Response: '" + responseStr + "'");
 
-      // 💡 "lockWheel" だけを比較
-      if (responseStr == "lockWheel") {
-        Serial.println("✅ do lock Wheel");
-        lockWheels();
-      } else {
-        Serial.println("❌ Comparison failed: '" + responseStr + "'");
+      if (responseStr == "lockWheels") {
+        Serial.println("do lock Wheel");
+        doLockWheels = true;
+        autoSerch = false;
+      } 
+      
+      else if (responseStr == "unLockWheels") {
+        Serial.println("do unlock Wheel");
+        doUnLockWheels = true;
+        autoSerch = true;
+      }
+      
+      else {
+        Serial.println("Comparison failed: '" + responseStr + "'");
       }
     } else {
       Serial.println("\r\nNo response from server");
@@ -600,30 +542,22 @@ void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
 /* カメラ撮影とhttp request postのテスト*/
 void camImagePost(){
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"image\":\"%s\"}", "image sending.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("sending an image") + "\"}";
+  uploadString(messageStr);
+  Serial.println(messageStr);
 
-  Serial.println("==== start Camera Image Post Test");
-  int take_picture_count = 0;
-  while (take_picture_count < TOTAL_PICTURE_COUNT) {
-    Serial.println("call takePicture()");
-    CamImage img = theCamera.takePicture();
-    Serial.println("======image info =========== @ cam Image post");
-    //printPixInfomation(img);
+  CamImage img = theCamera.takePicture();
 
-    if (img.isAvailable()) {
-      uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
-      size_t imageSize = img.getImgSize();
-      uploadImage(imgBuffer, imageSize);
-    } else {
-      Serial.println("Failed to take picture");
-    }
-  take_picture_count++;
+  //printPixInfomation(img);
+
+  if (img.isAvailable()) {
+    uint16_t* imgBuffer = (uint16_t*)img.getImgBuff();
+    size_t imageSize = img.getImgSize();
+    uploadImage(imgBuffer, imageSize);
+  } else {
+    Serial.println("Failed to take picture");
   }
-  //theCamera.end();
-  Serial.println("==== cam Image Post test is finished.\n");
+
 
   imagePost = false;
 }
@@ -836,66 +770,8 @@ void GS2200wifiSetup(){
   theHttpGs2200.config(HTTP_HEADER_HOST, HTTP_SRVR_IP);
   theHttpGs2200.config(HTTP_HEADER_CONTENT_TYPE, "application/octet-stream");
 
-  mqttHostParams.host     = (char *)MQTT_SRVR;        // MQTTサーバのホスト名
-  mqttHostParams.port     = (char *)MQTT_PORT;        // MQTTサーバのポート番号
-  mqttHostParams.clientID = (char *)MQTT_CLI_ID;      // MQTTクライアントID
-  mqttHostParams.userName = NULL;                     // ユーザー名（使用しない場合はNULL）
-  mqttHostParams.password = NULL;                     // パスワード（使用しない場合はNULL）
-  theMqttGs2200.begin(&mqttHostParams);               // MQTTクライアントを初期化
 
-  ConsoleLog( "Start MQTT Client");
-  if (false == theMqttGs2200.connect()) {
-    return;
-  }
-
-  ConsoleLog( "Start to receive MQTT Message");
-  // Prepare for the next chunck of incoming data
   WiFi_InitESCBuffer();
-
-  // Start the loop to receive the data
-  strncpy(mqtt.params.topic, MQTT_TOPIC1 , sizeof(mqtt.params.topic));
-  mqtt.params.QoS = 0;
-  mqtt.params.retain = 0;
-  if (true == theMqttGs2200.subscribe(&mqtt)) {
-    ConsolePrintf( "Subscribed! \n" );
-  }
-
-  strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
-  mqtt.params.QoS = 0;
-  mqtt.params.retain = 0;
-}
-
-// MQTTメッセージ送信
-void sendMqttMessage(const char* label, float probability, int targetArea) {
-  if (label == 24){
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "not detected.");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-  }
-  else {
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "Detected SLIM!!");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    // targetArea用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"area\":\"%d\"}", targetArea);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-
-    // label用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"label\":\"%s\"}", label);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-
-    // probability用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"probability\":%f}", probability);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-  }
 }
 
 // 推論結果送信
@@ -922,17 +798,16 @@ void sendResult(const char* label, float probability, int targetArea, int maxInd
 void CamCB(CamImage img){
   //Serial.println("->CamCB Call back");
 
-  if (!doInferrence) {
+  if (!doInference) {
     return;
   }
   
-  waitInferrence = true;
+  waitInference = true;
 
-  
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Taking photos.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("Take a picture") + "\"}";
+  uploadString(messageStr);
+  Serial.println(messageStr);
+
 
   Serial.println("\nCamCB Start ++++++++++++++++++ <<@CamCB>>");
   //printPixInfomation(img);
@@ -949,10 +824,9 @@ void CamCB(CamImage img){
     return;
   }
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Inference");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("Inference") + "\"}";
+  uploadString(messageStr);
+  Serial.println(messageStr);
   for (int i = 0; i < 17; i++) {
     delay(1000);
 
@@ -962,9 +836,7 @@ void CamCB(CamImage img){
     startMicros = millis();
     dnnrt.inputVariable(input, 0);
     dnnrt.forward();
-    //Serial.print("dnnrt output Size:");
     int size = dnnrt.outputSize(0);
-    //Serial.println(size);
 
     DNNVariable output = dnnrt.outputVariable(0);
 
@@ -1031,7 +903,6 @@ void CamCB(CamImage img){
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
 
 
-  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea);
   sendResult(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
   if (selectedImageOnly){
     if (maxIndex != 24){
@@ -1041,8 +912,8 @@ void CamCB(CamImage img){
   else {
     imagePost = true;
   }
-  doInferrence = false;
-  waitInferrence = false;
+  doInference = false;
+  waitInference = false;
   delay(2000);
 }
 
@@ -1127,8 +998,6 @@ void setup() {
   }
 
   digitalWrite(LED0, HIGH);  // turn on LED
-
-  move_nnbFile();
   //uploadNNB();
   checkAnalogRead();
   checkDrive();
@@ -1138,54 +1007,64 @@ void setup() {
     printError(err);
   }
 
-  delay(3000);
-  lockWheels();
-  delay(3000);
-  unlockWheels();
+  //delay(3000);
+  //lockWheels();
+  //delay(3000);
+  //unLockWheels();
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("SLIM ready.") + "\"}";
+  uploadString(messageStr);
+  Serial.println(messageStr);
   delay(3000);
-  doInferrence = true;
+  //doInference = true;
+  autoSerch = true;
 
 }
 
 void loop() {
+  //messageStr = "{\"status\":\"" + String("requestCommand") + "\"}";
+  //uploadString(messageStr);
 
-  delay(FIRST_INTERVAL); /* wait for predefined seconds to take still picture. */
+
+  delay(LOOP_INTERVAL); /* wait for predefined seconds to take still picture. */
   Serial.println("");
   Serial.println("loop");
   Serial.println("");
-  checkMQTTtopic();
+
+  if (doUnLockWheels){
+    unLockWheels();
+    doUnLockWheels = false;
+  }
+
+  if (doLockWheels){
+    lockWheels();
+    doLockWheels = false;
+  }
 
   if (autoSerch){
-    
-    //sendMqttMessage(maxLabel.c_str(), maxOutput);
-
     if (imagePost == true){
       camImagePost();
     }
-    Serial.println(maxLabel);
-    Serial.println(maxOutput);
 
-    
+    if (!detectedSLIM && !waitInference ){
 
-    if (!detectedSLIM && !waitInferrence ){
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Moving");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
+    messageStr = "{\"status\":\"" + String("Moving") + "\"}";
+    Serial.println(messageStr);
+    uploadString(messageStr);
     motor_handler(   25,   50);
     delay(1000);
     motor_handler(   0,    0);
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Movement ended.");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    doInferrence = true;
+    messageStr = "{\"status\":\"" + String("finished Moving") + "\"}";
+    uploadString(messageStr);
+    Serial.println(messageStr);
+
+    doInference = true;
     }
+  }
+  else {
+    messageStr = "{\"status\":\"" + String("waiting") + "\"}";
+    Serial.println(messageStr);
+    uploadString(messageStr);
   }
   //read_photo_reflector();
 }

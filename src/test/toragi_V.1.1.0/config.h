@@ -74,6 +74,4 @@
 #define  MQTT_PORT     "1883"
 #define  MQTT_CLI_ID   "Telit_Device_pub"
 #define  MQTT_TOPIC1   "fromNodeRed"
-#define  MQTT_TOPIC2   "fromSORAQ"
-
 #endif /*_CONFIG_H_*/

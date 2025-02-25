@@ -10,9 +10,9 @@
 ✔ Ver.0.3.4 電源ONからタイマーによる車輪ロックOFF及び自動走行開始
 ✔ Ver.0.3.5 is110のリビジョン違いの設定変更をconfigに追加
 ✔ Ver.0.4.0 roop内から定期的に画像送信
-✔ Ver.0.4.1 CamCBの中でinferrenceする
-✔ Ver.0.4.2 inferrenceの有無をスイッチングする
-✔ Ver.0.4.3 inferrenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
+✔ Ver.0.4.1 CamCBの中でinferenceする
+✔ Ver.0.4.2 inferenceの有無をスイッチングする
+✔ Ver.0.4.3 inferenceの結果をMQTTで送りつつ、画像をpostする。オブジェクト検出ロジックのバグ修正
 ✔ Ver.0.5.0 NNBファイルのフラッシュ書き込み機能およびフラッシュからのNNBファイル読み込み実行
  Ver.0.6.0 ラジコン走行
  Ver.0.6.1 自動走行追加
@@ -31,7 +31,7 @@ char version[] = "toragi_Ver.1.0.0";
 #include <Flash.h>
 #include <DNNRT.h>
 
-#define CONSOLE_BAUDRATE    57600
+#define CONSOLE_BAUDRATE    115200
 #define TOTAL_PICTURE_COUNT 1
 #define PICTURE_INTERVAL    1000
 #define FIRST_INTERVAL      3000
@@ -88,6 +88,7 @@ static String const label[25]= {"Back_R0",    "Back_R1",    "Back_R2",    "Back_
                                 "Top_R0",     "Top_R1",     "Top_R2",     "Top_R3",
                                 "empty"};
 
+
 //画像クロップ領域指定
 struct ClipRect {
     int x;
@@ -131,7 +132,7 @@ bool nnb_copy = true;
 char flashPath[] = "data/slim.nnb";
 char flashFolder[] = "data/";
 char nnbFile[] = "model.nnb";
-bool doInferrence   = false;
+bool doInference   = false;
 
 
 
@@ -146,7 +147,7 @@ bool selectedImageOnly = true;
 bool imagePost         = false;
 bool detectedSLIM      = false;
 bool autoSerch         = true;    //SLIM探索を行う
-bool waitInferrence    = true;    //推論を待つ
+bool waitInference    = true;    //推論を待つ
 
 // out put mode on/off
 bool photo_reflector_out    = false;
@@ -164,6 +165,8 @@ MqttGs2200 theMqttGs2200(&gs2200);
 MQTTGS2200_HostParams mqttHostParams; // MQTT接続のホストパラメータ
 bool served = false;
 MQTTGS2200_Mqtt mqtt;
+String messageStr;
+
 
 void listFiles(File dir) {
   if (!dir || !dir.isDirectory()) {
@@ -335,7 +338,7 @@ void checkMQTTtopic(){
       break;
     }
 
-    Serial.println("Recieve data: " + data);
+    Serial.println("===========================================Recieve data: " + data);
     
     // dataをパース
     splitString(data, param1, param2, param3, param4, param5, param6);
@@ -600,10 +603,8 @@ void uploadImage(uint16_t* imgBuffer, size_t imageSize) {
 /* カメラ撮影とhttp request postのテスト*/
 void camImagePost(){
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"image\":\"%s\"}", "image sending.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("sending an image") + "\"}";
+  uploadString(messageStr);
 
   Serial.println("==== start Camera Image Post Test");
   int take_picture_count = 0;
@@ -622,7 +623,7 @@ void camImagePost(){
     }
   take_picture_count++;
   }
-  //theCamera.end();
+
   Serial.println("==== cam Image Post test is finished.\n");
 
   imagePost = false;
@@ -859,43 +860,6 @@ void GS2200wifiSetup(){
   if (true == theMqttGs2200.subscribe(&mqtt)) {
     ConsolePrintf( "Subscribed! \n" );
   }
-
-  strncpy(mqtt.params.topic, MQTT_TOPIC2, sizeof(mqtt.params.topic));
-  mqtt.params.QoS = 0;
-  mqtt.params.retain = 0;
-}
-
-// MQTTメッセージ送信
-void sendMqttMessage(const char* label, float probability, int targetArea) {
-  if (label == 24){
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "not detected.");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-  }
-  else {
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"result\":\"%s\"}", "Detected SLIM!!");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    // targetArea用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"area\":\"%d\"}", targetArea);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-
-    // label用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"label\":\"%s\"}", label);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-
-    // probability用メッセージの準備
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"probability\":%f}", probability);
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-  }
 }
 
 // 推論結果送信
@@ -922,17 +886,15 @@ void sendResult(const char* label, float probability, int targetArea, int maxInd
 void CamCB(CamImage img){
   //Serial.println("->CamCB Call back");
 
-  if (!doInferrence) {
+  if (!doInference) {
     return;
   }
   
-  waitInferrence = true;
+  waitInference = true;
 
-  
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Taking photos.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("Take a picture") + "\"}";
+  uploadString(messageStr);
+
 
   Serial.println("\nCamCB Start ++++++++++++++++++ <<@CamCB>>");
   //printPixInfomation(img);
@@ -949,10 +911,8 @@ void CamCB(CamImage img){
     return;
   }
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Inference");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("Inference") + "\"}";
+  uploadString(messageStr);
   for (int i = 0; i < 17; i++) {
     delay(1000);
 
@@ -962,9 +922,7 @@ void CamCB(CamImage img){
     startMicros = millis();
     dnnrt.inputVariable(input, 0);
     dnnrt.forward();
-    //Serial.print("dnnrt output Size:");
     int size = dnnrt.outputSize(0);
-    //Serial.println(size);
 
     DNNVariable output = dnnrt.outputVariable(0);
 
@@ -1031,7 +989,6 @@ void CamCB(CamImage img){
   //Serial.println("CamCB finished+++++++++++++++++++++++\n");
 
 
-  sendMqttMessage(maxLabel.c_str(), maxOutput, targetArea);
   sendResult(maxLabel.c_str(), maxOutput, targetArea, maxIndex);
   if (selectedImageOnly){
     if (maxIndex != 24){
@@ -1041,8 +998,8 @@ void CamCB(CamImage img){
   else {
     imagePost = true;
   }
-  doInferrence = false;
-  waitInferrence = false;
+  doInference = false;
+  waitInference = false;
   delay(2000);
 }
 
@@ -1127,8 +1084,6 @@ void setup() {
   }
 
   digitalWrite(LED0, HIGH);  // turn on LED
-
-  move_nnbFile();
   //uploadNNB();
   checkAnalogRead();
   checkDrive();
@@ -1143,12 +1098,10 @@ void setup() {
   delay(3000);
   unlockWheels();
 
-  snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "SLIM ready.");
-  printf("Sending JSON: %s\n", mqtt.params.message);
-  mqtt.params.len = strlen(mqtt.params.message);
-  theMqttGs2200.publish(&mqtt);
+  messageStr = "{\"status\":\"" + String("SLIM ready.") + "\"}";
+  uploadString(messageStr);
   delay(3000);
-  doInferrence = true;
+  doInference = true;
 
 }
 
@@ -1161,30 +1114,24 @@ void loop() {
   checkMQTTtopic();
 
   if (autoSerch){
-    
-    //sendMqttMessage(maxLabel.c_str(), maxOutput);
-
     if (imagePost == true){
       camImagePost();
     }
-    Serial.println(maxLabel);
-    Serial.println(maxOutput);
+    //Serial.println(maxLabel);
+    //Serial.println(maxOutput);
+   
 
-    
+    if (!detectedSLIM && !waitInference ){
 
-    if (!detectedSLIM && !waitInferrence ){
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Moving");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
+    messageStr = "{\"status\":\"" + String("Moving") + "\"}";
+    uploadString(messageStr);
     motor_handler(   25,   50);
     delay(1000);
     motor_handler(   0,    0);
-    snprintf(mqtt.params.message, sizeof(mqtt.params.message), "{\"status\":\"%s\"}", "Movement ended.");
-    printf("Sending JSON: %s\n", mqtt.params.message);
-    mqtt.params.len = strlen(mqtt.params.message);
-    theMqttGs2200.publish(&mqtt);
-    doInferrence = true;
+    messageStr = "{\"status\":\"" + String("finished Moving") + "\"}";
+    uploadString(messageStr);
+
+    doInference = true;
     }
   }
   //read_photo_reflector();

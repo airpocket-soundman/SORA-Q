@@ -30,37 +30,31 @@
 #define  AP_SSID        "kumakero2.4"
 #define  PASSPHRASE     "4roses6126"
 #define  HTTP_SRVR_IP   "192.168.50.104"
-#define  MQTT_SRVR      "192.168.50.104"
 
 #elif defined(HOME3A)
 #define  AP_SSID        "airpocket"
 #define  PASSPHRASE     "openpass"
 #define  HTTP_SRVR_IP   "192.168.50.105"
-#define  MQTT_SRVR      "192.168.50.105"
 
 #elif defined(WORK)
 #define  AP_SSID        "J00WLN1305A"
 #define  PASSPHRASE     "m1n0ru0869553434@LAN"
 #define  HTTP_SRVR_IP   "192.168.1.65"
-#define  MQTT_SRVR      "192.168.1.65"
 
 #elif defined(WORK3A)
 #define  AP_SSID        "airpocket"
 #define  PASSPHRASE     "openpass"
 #define  HTTP_SRVR_IP   "192.168.101.56"
-#define  MQTT_SRVR      "192.168.191.56"
 
 #elif defined(NOTE3A)
 #define  AP_SSID        "airpocket"
 #define  PASSPHRASE     "openpass"
 #define  HTTP_SRVR_IP   "192.168.137.234"
-#define  MQTT_SRVR      "192.168.137.234"
 
 #elif defined(NOTE)
 #define  AP_SSID        "airpocket"
 #define  PASSPHRASE     "openpass"
 #define  HTTP_SRVR_IP   "192.168.137.1"
-#define  MQTT_SRVR      "192.168.137.1"
 
 #else
 #error "No configuration defined. Please define HOME, WORK, or NOTE."
@@ -70,10 +64,5 @@
 #define  HTTP_GET_PATH  "/getdata"
 #define  HTTP_POST_PATH "/postdata"
 #define  HTTP_POST_TEXT_PATH "/posttxt"
-
-#define  MQTT_PORT     "1883"
-#define  MQTT_CLI_ID   "Telit_Device_pub"
-#define  MQTT_TOPIC1   "fromNodeRed"
-#define  MQTT_TOPIC2   "fromSORAQ"
 
 #endif /*_CONFIG_H_*/
